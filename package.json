@@ -1,0 +1,15 @@
+{
+  "name": "absel-global",
+  "version": "3.1.0",
+  "description": "Absel Global website and Absel CRM (sales calling to verified FTD, marketing campaigns and broadcasts, WhatsApp and email automation)",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node tools/simulate.js",
+    "demo": "node tools/simulate.js --db db/demo.db --shift-to-now"
+  },
+  "engines": { "node": ">=22.13" },
+  "dependencies": {}
+}

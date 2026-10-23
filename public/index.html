@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!--FRAGMENT-START-->
+<title>Absel Global</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Open a trading account with Absel Markets, an FSC Mauritius licensed broker. Forex, indices, commodities, futures and crypto CFDs on MetaTrader 5.">
+<meta name="theme-color" content="#162040">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+[hidden]{display:none!important}
+body{margin:0}
+html{-webkit-text-size-adjust:100%}
+img{max-width:100%}
+
+/* Layout: conversion-first CFD broker page. Navy brand band carries pitch + conditions board + inline form;
+   a lead popup (CTA, exit-intent, timed) reuses the same form; light working sections; regulatory band; sticky mobile CTA. */
+:root{
+  /* ---- BRAND: Absel Markets ---- */
+  --brand:#162040;          /* Absel Markets primary navy (theme-color on abselmarkets.com) */
+  --brand-deep:#0E1530;
+  --brand-2:#1E2B55;
+  --cta:#2F6BFF;            /* action colour; swap for the logo's accent hex when confirmed */
+  --cta-hover:#1F57E6;
+  --cta-ink:#FFFFFF;
+  --cta-soft:rgba(47,107,255,.12);
+
+  --bg:#F3F5FA; --surface:#FFFFFF; --fg:#0F1734; --muted:#55607F; --line:#DCE1EC;
+  --band-fg:#EEF2FA; --band-muted:#A6B0CC; --band-line:rgba(238,242,250,.12);
+  --up:#14A06B; --down:#E04A4A; --warn:#B54A23; --warn-soft:rgba(181,74,35,.09);
+  --f-display:"Schibsted Grotesk","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Hanken Grotesk","Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px; --wrap:1200px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --brand:#131C3A; --brand-deep:#0A1024; --brand-2:#1B2650;
+  --cta:#4A7DFF; --cta-hover:#6690FF; --cta-soft:rgba(74,125,255,.16);
+  --bg:#0A1024; --surface:#111A35; --fg:#E7EBF5; --muted:#9AA4C2; --line:#232D4E;
+  --up:#2FC587; --down:#F06A6A; --warn:#E5794C; --warn-soft:rgba(229,121,76,.12); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --brand:#131C3A; --brand-deep:#0A1024; --brand-2:#1B2650;
+  --cta:#4A7DFF; --cta-hover:#6690FF; --cta-soft:rgba(74,125,255,.16);
+  --bg:#0A1024; --surface:#111A35; --fg:#E7EBF5; --muted:#9AA4C2; --line:#232D4E;
+  --up:#2FC587; --down:#F06A6A; --warn:#E5794C; --warn-soft:rgba(229,121,76,.12); color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+body.locked{overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:60;background:var(--brand-deep)}
+h1,h2,h3,h4{font-family:var(--f-display);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:-.018em}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:var(--wrap);margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--cta)}
+:focus-visible{outline:2px solid var(--cta);outline-offset:2px;border-radius:4px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:700 15px/1 var(--f-body);padding:15px 24px;border-radius:8px;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:background .15s,border-color .15s,transform .15s;white-space:nowrap}
+.btn-cta{background:var(--cta);color:var(--cta-ink);box-shadow:0 8px 20px -10px var(--cta)}
+.btn-cta:hover{background:var(--cta-hover)}
+.btn-line{border-color:var(--line);color:var(--fg);background:transparent}
+.btn-line:hover{border-color:var(--cta);color:var(--cta)}
+.btn-line-band{border-color:rgba(238,242,250,.28);color:var(--band-fg);background:transparent}
+.btn-line-band:hover{border-color:var(--band-fg)}
+.btn svg{flex:none}
+
+/* Risk bar */
+.riskbar{background:var(--brand-deep);color:var(--band-muted);font-size:12.5px;line-height:1.45}
+.riskbar .wrap{padding-block:8px;text-align:center}
+.riskbar b{color:var(--band-fg)}
+
+/* Header */
+header.site{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--brand);color:var(--band-fg);border-bottom:1px solid var(--band-line)}
+header.site .wrap{display:flex;align-items:center;gap:26px;padding-block:14px}
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--band-fg)}
+.logo-img{display:block;height:45px;width:auto}
+@media (max-width:480px){.logo-img{height:38px}}
+.logo-word{display:flex;flex-direction:column;line-height:1}
+.logo-word b{font:800 22px/1 var(--f-display);letter-spacing:.07em}
+.logo-word span{font:600 10px/1 var(--f-mono);letter-spacing:.46em;color:var(--band-muted);margin-top:5px}
+nav.main{display:flex;gap:26px;margin-left:auto}
+nav.main a{text-decoration:none;font-size:15px;color:var(--band-muted);font-weight:500}
+nav.main a:hover{color:var(--band-fg)}
+.head-actions{display:flex;gap:10px;align-items:center}
+.head-actions .btn{padding:11px 18px;font-size:14.5px}
+.login{font-size:14.5px;font-weight:600;color:var(--band-fg);text-decoration:none;padding:11px 8px}
+@media (max-width:1020px){nav.main{display:none}.head-actions{margin-left:auto}}
+@media (max-width:480px){.login{display:none}}
+
+/* Hero */
+.hero{background:radial-gradient(1200px 500px at 85% -10%,var(--brand-2),transparent 60%),var(--brand);color:var(--band-fg);position:relative;overflow:hidden}
+.hero canvas{position:absolute;left:38%;top:40px;width:640px;height:640px;opacity:.5;pointer-events:none}
+.hero .wrap{position:relative;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;align-items:start;padding-block:64px 72px}
+.badge{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--band-line);background:rgba(255,255,255,.04);border-radius:999px;padding:6px 14px 6px 6px;font-size:13px;color:var(--band-muted)}
+.badge b{background:var(--up);color:#fff;font:600 11px/1 var(--f-mono);letter-spacing:.1em;padding:5px 8px;border-radius:999px}
+.hero h1{font-size:clamp(38px,5.2vw,64px);font-weight:800;margin-top:20px}
+.hero h1 span{color:#8FB0FF}
+.hero .lede{font-size:18px;color:var(--band-muted);max-width:560px;margin-top:20px}
+.hero-ctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+
+/* Conditions board */
+.board{margin-top:40px;border:1px solid var(--band-line);border-radius:12px;background:rgba(5,10,30,.28);max-width:600px}
+.board-top{display:flex;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--band-line);font:500 11.5px/1 var(--f-mono);letter-spacing:.1em;color:var(--band-muted);text-transform:uppercase}
+.board-top i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--up);margin-right:8px;vertical-align:1px;animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.board-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.board-grid div{padding:18px;border-left:1px solid var(--band-line)}
+.board-grid div:first-child{border-left:0}
+.board-grid b{display:block;font:600 26px/1 var(--f-mono);color:var(--band-fg);letter-spacing:-.02em}
+.board-grid b small{font-size:13px;color:var(--band-muted);font-weight:500;margin-left:3px}
+.board-grid span{display:block;font-size:12.5px;color:var(--band-muted);margin-top:8px}
+@media (max-width:560px){.board-grid{grid-template-columns:1fr 1fr}.board-grid div:nth-child(3){border-left:0}.board-grid div:nth-child(n+3){border-top:1px solid var(--band-line)}}
+@media (max-width:1020px){.hero .wrap{grid-template-columns:1fr;gap:40px;padding-block:44px 56px}.hero canvas{left:auto;right:-320px;top:-60px;opacity:.3}}
+
+/* Lead card (shared by hero + popup) */
+.lead-card{background:var(--surface);color:var(--fg);border-radius:14px;padding:28px;border:1px solid var(--line);box-shadow:0 30px 60px -30px rgba(3,8,26,.6)}
+.lead-card h2{font-size:24px}
+.lead-card .sub{color:var(--muted);font-size:14.5px;margin-top:6px}
+.lf{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field.full{grid-column:1/-1}
+.field label{font-size:12.5px;font-weight:700;letter-spacing:.01em}
+.field input,.field select{font:400 15px/1.3 var(--f-body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;width:100%;min-width:0}
+.field input:focus,.field select:focus{outline:none;border-color:var(--cta);box-shadow:0 0 0 3px var(--cta-soft)}
+.field.invalid input,.field.invalid select{border-color:var(--warn)}
+.field .err{font-size:12.5px;color:var(--warn)}
+.field .err:empty{display:none}
+.phone{display:grid;grid-template-columns:84px 1fr;gap:8px}
+.phone input:first-child{text-align:center;font-family:var(--f-mono);font-size:14px}
+.check{grid-column:1/-1;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--muted);line-height:1.5}
+.check.invalid{color:var(--warn)}
+.check input{margin-top:2px;accent-color:var(--cta);width:16px;height:16px;flex:none}
+.restricted{grid-column:1/-1;background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:12px 14px;font-size:13.5px}
+.lf button[type=submit]{grid-column:1/-1;padding:17px;font-size:16px;width:100%}
+.lf button[disabled]{opacity:.5;cursor:not-allowed}
+.lf .risk{grid-column:1/-1;font-size:11.5px;color:var(--muted);line-height:1.5}
+.lf .send-err{grid-column:1/-1;font-size:13px;color:var(--warn)}
+.trust-row{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.trust-row span{display:inline-flex;align-items:center;gap:6px}
+.trust-row svg{color:var(--up)}
+.done .tick{width:50px;height:50px;border-radius:50%;background:var(--cta-soft);color:var(--cta);display:grid;place-items:center;margin-bottom:18px}
+.done h3{font-size:24px}
+.done p{color:var(--muted);margin-top:10px}
+.done .ref{margin-top:16px;font:500 13px var(--f-mono);color:var(--muted)}
+@media (max-width:520px){.lead-card{padding:22px}.lf{grid-template-columns:1fr}}
+
+/* Ticker */
+.ticker{background:var(--brand-deep);border-block:1px solid var(--band-line);color:var(--band-fg);min-height:46px;overflow:hidden;position:relative}
+.tape{display:flex;gap:0;width:max-content;animation:tape 50s linear infinite}
+.tape span{display:inline-flex;gap:10px;align-items:center;padding:13px 26px;border-right:1px solid var(--band-line);font:500 13px/1 var(--f-mono);white-space:nowrap}
+.tape span em{font-style:normal;color:var(--band-muted);font-size:11px;letter-spacing:.1em}
+@keyframes tape{to{transform:translateX(-50%)}}
+.ticker:hover .tape{animation-play-state:paused}
+#tvTicker{position:relative}
+
+/* Trust strip */
+.trust{background:var(--surface);border-bottom:1px solid var(--line)}
+.trust .wrap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0}
+.trust div{padding:22px 18px;border-left:1px solid var(--line);display:flex;gap:12px;align-items:center;min-width:0}
+.trust div:first-child{border-left:0;padding-left:0}
+.trust svg{flex:none;color:var(--cta)}
+.trust b{display:block;font-size:14.5px}
+.trust small{display:block;color:var(--muted);font-size:12.5px;line-height:1.35}
+@media (max-width:1020px){.trust .wrap{grid-template-columns:repeat(2,minmax(0,1fr))}.trust div{border-left:0;padding-left:0;border-top:1px solid var(--line)}.trust div:nth-child(-n+2){border-top:0}.trust div:last-child{grid-column:1/-1}}
+
+/* Sections */
+section.block{padding-block:96px}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:end;gap:20px 40px;margin-bottom:44px}
+.head h2{font-size:clamp(30px,3.6vw,46px);margin-top:12px;max-width:660px}
+.head p{color:var(--muted);max-width:430px}
+@media (max-width:760px){section.block{padding-block:64px}}
+
+/* Markets tabs */
+.mk-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+.mk-tabs button{font:600 14.5px var(--f-body);padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.mk-tabs button[aria-selected="true"]{background:var(--brand);color:#EEF2FA;border-color:var(--brand)}
+.mk-panel{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.mk-info{padding:34px}
+.mk-info h3{font-size:30px}
+.mk-info p{color:var(--muted);margin-top:12px}
+.mk-info ul{list-style:none;padding:0;margin:22px 0 26px;display:grid;gap:10px}
+.mk-info li{display:flex;gap:10px;font-size:15px}
+.mk-info li::before{content:"";flex:none;width:6px;height:6px;margin-top:9px;border-radius:50%;background:var(--cta)}
+.mk-table{border-left:1px solid var(--line);overflow-x:auto}
+.mk-table table{width:100%;border-collapse:collapse;min-width:360px}
+.mk-table th,.mk-table td{text-align:left;padding:15px 22px;border-bottom:1px solid var(--line);font-size:14.5px}
+.mk-table th{font:600 11.5px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+.mk-table td.sym{font-family:var(--f-mono);font-weight:600}
+.mk-table td.act{text-align:right}
+.mk-table tr:last-child td{border-bottom:0}
+.mini-btn{font:700 13px var(--f-body);color:var(--cta);background:var(--cta-soft);border:0;border-radius:6px;padding:7px 12px;cursor:pointer}
+.mini-btn:hover{background:var(--cta);color:#fff}
+@media (max-width:900px){.mk-panel{grid-template-columns:1fr}.mk-table{border-left:0;border-top:1px solid var(--line)}.mk-info{padding:26px}}
+
+/* Accounts */
+.acc{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;align-items:stretch}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:26px;display:flex;flex-direction:column;position:relative}
+.plan.feat{border:2px solid var(--cta);box-shadow:0 24px 50px -30px var(--cta)}
+.plan .flag{position:absolute;top:-12px;left:24px;background:var(--cta);color:#fff;font:600 11px/1 var(--f-mono);letter-spacing:.1em;padding:6px 10px;border-radius:999px}
+.plan .kind{font:600 11.5px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.plan h3{font-size:26px;margin-top:10px}
+.plan .price{margin-top:18px;padding-block:16px;border-block:1px solid var(--line)}
+.plan .price b{font:600 34px/1 var(--f-mono);letter-spacing:-.02em}
+.plan .price span{display:block;color:var(--muted);font-size:13px;margin-top:6px}
+.plan ul{list-style:none;padding:0;margin:18px 0 24px;display:grid;gap:10px;font-size:14.5px}
+.plan li{display:flex;justify-content:space-between;gap:12px}
+.plan li span:first-child{color:var(--muted)}
+.plan li span:last-child{font-family:var(--f-mono);font-size:14px;text-align:right}
+.plan .btn{margin-top:auto;width:100%}
+.plan p.desc{color:var(--muted);font-size:14.5px;margin-top:12px}
+@media (max-width:1100px){.acc{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:28px}}
+@media (max-width:600px){.acc{grid-template-columns:1fr}}
+
+/* Platform */
+.platform{background:var(--surface);border-block:1px solid var(--line)}
+.plat{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center}
+.plat h2{font-size:clamp(30px,3.6vw,46px);margin-top:12px}
+.plat .copy>p{color:var(--muted);margin-top:16px;max-width:520px}
+.devices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:26px;max-width:480px}
+.devices a,.devices span{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:14.5px;font-weight:600;text-decoration:none}
+.devices svg{color:var(--cta);flex:none}
+.terminal{background:var(--brand);color:var(--band-fg);border-radius:14px;padding:22px;border:1px solid var(--band-line);box-shadow:0 30px 60px -36px rgba(3,8,26,.7)}
+.term-top{display:flex;justify-content:space-between;align-items:center;font:500 11.5px/1 var(--f-mono);color:var(--band-muted);letter-spacing:.08em}
+.term-top i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--band-line);margin-right:5px}
+.chart{margin-top:16px;border:1px solid var(--band-line);border-radius:8px;overflow:hidden}
+.chart canvas{display:block;width:100%;height:170px}
+.term-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--band-line);margin-top:14px;border-radius:8px;overflow:hidden}
+.term-stats div{background:var(--brand);padding:14px}
+.term-stats b{display:block;font:600 22px/1 var(--f-mono);color:#8FB0FF}
+.term-stats span{display:block;font-size:12px;color:var(--band-muted);margin-top:6px;line-height:1.3}
+@media (max-width:900px){.plat{grid-template-columns:1fr;gap:36px}}
+@media (max-width:480px){.term-stats{grid-template-columns:1fr 1fr}}
+
+/* Steps */
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+.step{border-top:2px solid var(--fg);padding-top:22px}
+.step .num{font:600 12.5px/1 var(--f-mono);color:var(--cta);letter-spacing:.1em}
+.step h3{font-size:23px;margin-top:14px}
+.step p{color:var(--muted);margin-top:10px;font-size:15px}
+.steps-cta{margin-top:40px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.steps-cta small{color:var(--muted)}
+@media (max-width:760px){.steps{grid-template-columns:1fr}}
+
+/* Regulation */
+.reg{background:var(--brand);color:var(--band-fg)}
+.reg .head p{color:var(--band-muted)}
+.reg .eyebrow{color:#8FB0FF}
+.certs{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.cert{border:1px solid var(--band-line);border-radius:12px;padding:28px;background:rgba(255,255,255,.03)}
+.cert-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.cert h3{font-size:22px}
+.cert .issuer{color:var(--band-muted);font-size:14px;margin-top:6px}
+.status{flex:none;font:600 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--up);border:1px solid currentColor;padding:6px 9px;border-radius:999px}
+.cert dl{display:grid;grid-template-columns:auto 1fr;gap:10px 22px;margin:24px 0 0;font-size:14.5px}
+.cert dt{color:var(--band-muted)}
+.cert dd{margin:0;font-family:var(--f-mono);font-size:14px;min-width:0}
+.cert a{display:inline-block;margin-top:22px;color:#8FB0FF;font-weight:700;font-size:14.5px;text-decoration:none}
+.cert a:hover{text-decoration:underline}
+.protect{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 32px;margin-top:56px;padding-top:40px;border-top:1px solid var(--band-line)}
+.protect h4{font-size:17px}
+.protect p{color:var(--band-muted);font-size:14.5px;margin-top:8px}
+@media (max-width:900px){.certs{grid-template-columns:1fr}.protect{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.protect{grid-template-columns:1fr}.cert{padding:22px}.cert dl{grid-template-columns:1fr;gap:2px}.cert dd{margin-bottom:10px}}
+
+/* Payments */
+.pay-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:40px;align-items:center}
+.pay-row h2{font-size:clamp(26px,3vw,38px);margin-top:12px}
+.pay-row .notes{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:18px;font-size:14px;color:var(--muted)}
+.pay-row .notes span::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--up);margin-right:8px;vertical-align:2px}
+.pay{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pay span{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 12px;font-weight:700;font-size:15px;text-align:center}
+@media (max-width:900px){.pay-row{grid-template-columns:1fr;gap:24px}}
+@media (max-width:480px){.pay{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Partners */
+.partners{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
+.partner{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:10px}
+.partner .kind{font:600 11.5px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--cta)}
+.partner h3{font-size:22px}
+.partner p{color:var(--muted);font-size:15px}
+.partner .btn{margin-top:auto;align-self:flex-start}
+@media (max-width:900px){.partners{grid-template-columns:1fr}}
+
+/* FAQ */
+.faq-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr);gap:56px}
+.faq-grid h2{font-size:clamp(30px,3.6vw,46px);margin-top:12px}
+.faq-grid .intro p{color:var(--muted);margin-top:16px}
+.faq-grid .intro .btn{margin-top:24px}
+details{border-bottom:1px solid var(--line)}
+details:first-child{border-top:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:22px 40px 22px 0;font:600 18px/1.35 var(--f-display);position:relative}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";position:absolute;right:4px;top:18px;font:400 24px var(--f-mono);color:var(--cta);transition:transform .2s}
+details[open] summary::after{transform:rotate(45deg)}
+details p{padding:0 40px 22px 0;color:var(--muted)}
+@media (max-width:900px){.faq-grid{grid-template-columns:1fr;gap:28px}}
+
+/* Final CTA */
+.final{background:var(--cta);color:#fff}
+.final .wrap{display:flex;flex-wrap:wrap;gap:28px;justify-content:space-between;align-items:center;padding-block:64px}
+.final h2{font-size:clamp(28px,3.6vw,44px);max-width:640px}
+.final p{opacity:.85;margin-top:12px;max-width:560px}
+.btn-white{background:#fff;color:#0F1734}
+.btn-white:hover{background:#E9EEFF}
+.btn-line-white{border-color:rgba(255,255,255,.5);color:#fff}
+.btn-line-white:hover{border-color:#fff}
+
+/* Footer */
+footer{background:var(--brand-deep);color:var(--band-muted);font-size:14px}
+footer .wrap{padding-block:56px 40px}
+.foot-top{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(3,minmax(0,1fr));gap:32px}
+footer h4{font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--band-fg);margin-bottom:14px}
+footer ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+footer a{color:var(--band-muted);text-decoration:none}
+footer a:hover{color:var(--band-fg)}
+.contact-line{display:block;margin-top:4px;font-family:var(--f-mono);font-size:13.5px;color:var(--band-fg);user-select:all}
+.c-label{display:block;margin-top:12px}
+.c-label:first-of-type{margin-top:0}
+.legal{margin-top:44px;padding-top:28px;border-top:1px solid var(--band-line);display:grid;gap:18px;font-size:12.5px;line-height:1.65}
+.legal h5{font:700 12.5px var(--f-body);color:var(--band-fg);margin:0 0 4px}
+.copy{margin-top:28px;display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;font-size:12.5px}
+@media (max-width:900px){.foot-top{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.foot-top{grid-template-columns:1fr}}
+
+/* Popup */
+.modal{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.modal-bg{position:absolute;inset:0;background:rgba(6,10,26,.72);backdrop-filter:blur(4px);animation:fade .2s ease}
+.modal-box{position:relative;width:100%;max-width:880px;max-height:100%;overflow:auto;display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);border-radius:16px;background:var(--surface);box-shadow:0 40px 80px -30px rgba(0,0,0,.6);animation:rise .25s ease}
+.modal-side{background:var(--brand);color:var(--band-fg);padding:34px;display:flex;flex-direction:column;gap:18px}
+.modal-side h3{font-size:28px}
+.modal-side p{color:var(--band-muted);font-size:15px}
+.modal-side ul{list-style:none;padding:0;margin:4px 0 0;display:grid;gap:14px}
+.modal-side li{display:flex;gap:12px;font-size:14.5px}
+.modal-side li svg{flex:none;color:#8FB0FF;margin-top:2px}
+.modal-side .lic{margin-top:auto;font:500 12px var(--f-mono);color:var(--band-muted);border-top:1px solid var(--band-line);padding-top:16px;letter-spacing:.04em}
+.modal-main{padding:34px}
+.modal-main .lead-card{border:0;box-shadow:none;padding:0;border-radius:0}
+.modal-x{position:absolute;top:12px;right:12px;width:38px;height:38px;border-radius:50%;border:0;background:var(--bg);color:var(--fg);cursor:pointer;display:grid;place-items:center;z-index:2}
+.modal-x:hover{background:var(--line)}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}}
+@media (max-width:760px){.modal{place-items:end center;padding-inline:0;padding-bottom:0}.modal-box{grid-template-columns:1fr;border-radius:16px 16px 0 0;max-height:94vh}.modal-side{display:none}.modal-main{padding:26px max(20px,env(safe-area-inset-left,0px)) calc(26px + env(safe-area-inset-bottom,0px))}}
+
+/* Floating + mobile sticky */
+.wa{position:fixed;right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:40;width:56px;height:56px;border-radius:50%;background:#25D366;color:#fff;display:grid;place-items:center;box-shadow:0 10px 24px -8px rgba(0,0,0,.4);transition:transform .15s}
+.wa:hover{transform:scale(1.06)}
+.mbar{display:none}
+@media (max-width:760px){
+  .mbar{display:flex;gap:10px;position:fixed;left:0;right:0;bottom:0;z-index:45;background:var(--surface);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-shadow:0 -10px 30px -20px rgba(0,0,0,.4)}
+  .mbar .btn{flex:1;padding:14px}
+  .wa{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  footer .wrap{padding-bottom:110px}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<!-- =================== CONFIG (edit before deploying) =================== -->
+<script>
+window.ABSEL_CONFIG = {
+  leadEndpoint: "/api/leads",  // the Node backend (server.js). Change only if you post leads somewhere else.
+  registerUrl: "https://client.abselmarkets.com/register",
+  loginUrl: "https://client.abselmarkets.com",
+  whatsapp: "447576077989",
+  popupDelaySeconds: 35,       // auto-open the popup once per visit after this many seconds (0 = off)
+  exitIntent: true,            // open the popup once when a desktop visitor moves to leave
+  liveTicker: true             // TradingView live price tape (works on your domain; falls back to a static tape)
+};
+</script>
+
+<div class="riskbar"><div class="wrap"><b>Risk warning:</b> CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage. You may lose more than your initial deposit.</div></div>
+
+<header class="site">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Absel Global home">
+      <img class="logo-img" src="assets/absel-global-logo-white.png" alt="Absel Global" width="107" height="45">
+    </a>
+    <nav class="main" aria-label="Main">
+      <a href="#markets">Markets</a>
+      <a href="#accounts">Accounts</a>
+      <a href="#platform">Platform</a>
+      <a href="#regulation">Regulation</a>
+      <a href="#partners">Partners</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="head-actions">
+      <a class="login" data-cfg-href="loginUrl" href="https://client.abselmarkets.com" target="_blank" rel="noopener">Log in</a>
+      <button class="btn btn-cta" data-open-lead>Open account</button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+<!-- =================== HERO =================== -->
+<section class="hero">
+  <canvas id="globe" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div>
+      <span class="badge"><b>FSC</b> Licensed &amp; regulated in Mauritius · GB25205423</span>
+      <h1>Trade global markets with <span>tighter spreads</span> and a regulated broker.</h1>
+      <p class="lede">Forex, gold, indices, oil and crypto CFDs on MetaTrader 5. Raw ECN pricing from 0.2 pips, segregated client funds and a personal account manager from your first call.</p>
+      <div class="hero-ctas">
+        <button class="btn btn-cta" data-open-lead>
+          Open live account
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <a class="btn btn-line-band" href="#accounts">Compare accounts</a>
+      </div>
+      <div class="board" aria-label="Trading conditions">
+        <div class="board-top"><span><i></i>Trading conditions</span><span>Mon–Fri · 24h GMT</span></div>
+        <div class="board-grid">
+          <div><b>0.2<small>pips</small></b><span>ECN spreads from</span></div>
+          <div><b>1:500</b><span>Max leverage</span></div>
+          <div><b>0.01</b><span>Min lot size</span></div>
+          <div><b>0%</b><span>Deposit fees</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="lead-card" id="start">
+      <div data-lead-slot="hero"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== TICKER =================== -->
+<div class="ticker" aria-label="Instruments">
+  <div id="tvTicker"></div>
+  <div id="tapeFallback">
+    <div class="tape" aria-hidden="true"></div>
+  </div>
+</div>
+
+<!-- =================== TRUST =================== -->
+<div class="trust">
+  <div class="wrap">
+    <div><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg><span><b>FSC regulated</b><small>Two active licences</small></span></div>
+    <div><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg><span><b>Segregated funds</b><small>Kept apart from company money</small></span></div>
+    <div><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/></svg><span><b>MetaTrader 5</b><small>Desktop, web &amp; mobile</small></span></div>
+    <div><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span><b>Indemnity insured</b><small>Professional cover with MUA</small></span></div>
+    <div><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg><span><b>Swap-free option</b><small>Islamic accounts available</small></span></div>
+  </div>
+</div>
+
+<!-- =================== MARKETS =================== -->
+<section class="block" id="markets">
+  <div class="wrap">
+    <div class="head">
+      <div><span class="eyebrow">Markets</span><h2>3,000+ instruments across five asset classes.</h2></div>
+      <p>Go long or short on currencies, indices, energy, metals and digital assets from a single MT5 account.</p>
+    </div>
+    <div class="mk-tabs" role="tablist" aria-label="Asset classes"></div>
+    <div class="mk-panel" id="mkPanel" role="tabpanel"></div>
+  </div>
+</section>
+
+<!-- =================== ACCOUNTS =================== -->
+<section class="block" id="accounts" style="padding-top:0">
+  <div class="wrap">
+    <div class="head">
+      <div><span class="eyebrow">Accounts</span><h2>An account for every trading style.</h2></div>
+      <p>All accounts trade on MetaTrader 5 from 0.01 lots, with leverage up to 1:500 and sub-accounts included.</p>
+    </div>
+    <div class="acc">
+      <article class="plan">
+        <span class="kind">Commission-free</span><h3>STP</h3>
+        <div class="price"><b>0.9</b><span>Spreads from (pips)</span></div>
+        <ul><li><span>Commission</span><span>$0</span></li><li><span>Leverage</span><span>1:500</span></li><li><span>Min lot</span><span>0.01</span></li><li><span>Sub-accounts</span><span>Yes</span></li></ul>
+        <button class="btn btn-line" data-open-lead data-interest="STP account">Open STP account</button>
+      </article>
+      <article class="plan feat">
+        <span class="flag">FOR ACTIVE TRADERS</span>
+        <span class="kind">Raw spreads</span><h3>ECN</h3>
+        <div class="price"><b>0.2</b><span>Spreads from (pips)</span></div>
+        <ul><li><span>Commission</span><span>From $7/lot</span></li><li><span>Leverage</span><span>1:500</span></li><li><span>Min lot</span><span>0.01</span></li><li><span>Sub-accounts</span><span>Yes</span></li></ul>
+        <button class="btn btn-cta" data-open-lead data-interest="ECN account">Open ECN account</button>
+      </article>
+      <article class="plan">
+        <span class="kind">Sharia-compliant</span><h3>Islamic</h3>
+        <div class="price"><b>$0</b><span>Overnight swap</span></div>
+        <p class="desc">Swap-free trading on the same instruments, pricing and platform. No overnight interest charged or paid.</p>
+        <button class="btn btn-line" style="margin-top:auto" data-open-lead data-interest="Islamic (swap-free) account">Request Islamic account</button>
+      </article>
+      <article class="plan">
+        <span class="kind">Start small</span><h3>Cent</h3>
+        <div class="price"><b>100×</b><span>Balance shown in cents</span></div>
+        <p class="desc">Test live strategies with real execution and small capital. Ideal for new traders and EA testing.</p>
+        <button class="btn btn-line" style="margin-top:auto" data-open-lead data-interest="Cent account">Request Cent account</button>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- =================== PLATFORM =================== -->
+<section class="block platform" id="platform">
+  <div class="wrap plat">
+    <div class="copy">
+      <span class="eyebrow">Platform</span>
+      <h2>MetaTrader 5, wherever you trade.</h2>
+      <p>Absel Markets is an authorised MT5 broker. Advanced charting, Depth of Market, algorithmic trading with MQL5, and VPS hosting to keep your Expert Advisors running 24/5.</p>
+      <div class="devices">
+        <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8"/></svg>Windows</span>
+        <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>WebTrader</span>
+        <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/></svg>iOS</span>
+        <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/></svg>Android</span>
+      </div>
+    </div>
+    <div class="terminal" aria-label="MetaTrader 5 capabilities">
+      <div class="term-top"><span><i></i><i></i><i></i></span><span>MT5 · ABSEL MARKETS</span></div>
+      <div class="chart"><canvas id="candles" aria-hidden="true"></canvas></div>
+      <div class="term-stats">
+        <div><b>21+</b><span>Timeframes</span></div>
+        <div><b>80+</b><span>Indicators</span></div>
+        <div><b>100</b><span>Open charts</span></div>
+        <div><b>2</b><span>Netting &amp; hedging</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== STEPS =================== -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="head"><div><span class="eyebrow">Getting started</span><h2>Live in three steps.</h2></div></div>
+    <div class="steps">
+      <div class="step"><span class="num">STEP 01</span><h3>Register</h3><p>Share your details. An account specialist calls you to choose the right account type.</p></div>
+      <div class="step"><span class="num">STEP 02</span><h3>Verify</h3><p>Upload ID and proof of address. KYC is required under our FSC licence.</p></div>
+      <div class="step"><span class="num">STEP 03</span><h3>Fund and trade</h3><p>Deposit by card, bank wire, USDT or e-wallet with 0% deposit fees, then log in to MT5.</p></div>
+    </div>
+    <div class="steps-cta"><button class="btn btn-cta" data-open-lead>Start step 1</button><small>Takes about 2 minutes</small></div>
+  </div>
+</section>
+
+<!-- =================== REGULATION =================== -->
+<section class="block reg" id="regulation">
+  <div class="wrap">
+    <div class="head">
+      <div><span class="eyebrow">Regulation</span><h2>Two active licences from the Financial Services Commission, Mauritius.</h2></div>
+      <p>Authorised as a Full Service Investment Dealer, with client money held separately from company funds.</p>
+    </div>
+    <div class="certs">
+      <article class="cert">
+        <div class="cert-top"><div><h3>Global Business Licence</h3><p class="issuer">Financial Services Commission, Mauritius</p></div><span class="status">Active</span></div>
+        <dl><dt>Licence holder</dt><dd>Absel Markets</dd><dt>Licence no.</dt><dd>GB25205423</dd><dt>Licence code</dt><dd>FS-4.1</dd><dt>Issued</dt><dd>24 Dec 2025</dd></dl>
+        <a href="https://abselmarkets.com/documents/GBC_Licence.pdf" target="_blank" rel="noopener">View licence (PDF) →</a>
+      </article>
+      <article class="cert">
+        <div class="cert-top"><div><h3>Investment Dealer Licence</h3><p class="issuer">Full Service Dealer, excluding underwriting</p></div><span class="status">Active</span></div>
+        <dl><dt>Licence holder</dt><dd>Absel Markets</dd><dt>Licence no.</dt><dd>GB25205423</dd><dt>Licence code</dt><dd>SEC-2.1B</dd><dt>Issued</dt><dd>24 Dec 2025</dd></dl>
+        <a href="https://abselmarkets.com/documents/ID_Licence.pdf" target="_blank" rel="noopener">View licence (PDF) →</a>
+      </article>
+    </div>
+    <div class="protect">
+      <div><h4>Segregated client funds</h4><p>Deposits sit in dedicated bank accounts, separate from operating capital.</p></div>
+      <div><h4>Professional indemnity cover</h4><p>Insurance arranged with MUA for an added layer of security.</p></div>
+      <div><h4>Transparent pricing</h4><p>Fees, spreads and trading conditions disclosed in full.</p></div>
+      <div><h4>AML/CFT compliance</h4><p>Annual reviews and risk assessments under FSC guidelines.</p></div>
+      <div><h4>Regulatory reporting</h4><p>Quarterly transaction reports and annual compliance certificates.</p></div>
+      <div><h4>Independent complaints route</h4><p>Unresolved complaints can be escalated to the FSC.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== PAYMENTS =================== -->
+<section class="block" id="payments">
+  <div class="wrap pay-row">
+    <div><span class="eyebrow">Funding</span><h2>Fund your account in minutes.</h2>
+      <div class="notes"><span>Instant deposits</span><span>SSL secured</span><span>0% deposit fees</span></div>
+    </div>
+    <div class="pay"><span>Visa</span><span>Mastercard</span><span>Bank wire</span><span>USDT</span><span>Skrill</span><span>Neteller</span><span>UnionPay</span><span>More soon</span></div>
+  </div>
+</section>
+
+<!-- =================== PARTNERS =================== -->
+<section class="block" id="partners" style="padding-top:0">
+  <div class="wrap">
+    <div class="head">
+      <div><span class="eyebrow">Partnerships</span><h2>Earn with Absel.</h2></div>
+      <p>Programmes for introducers, fund managers and strategy providers, with a dedicated partner manager.</p>
+    </div>
+    <div class="partners">
+      <div class="partner"><span class="kind">IB programme</span><h3>Introducing Brokers</h3><p>Refer traders and earn competitive commissions on their volume, with real-time reporting in your partner area.</p><button class="btn btn-line" data-open-lead data-interest="Introducing Broker (IB)">Become an IB</button></div>
+      <div class="partner"><span class="kind">PAMM / MAM</span><h3>Money Managers</h3><p>Trade multiple client accounts from one master account with flexible allocation methods.</p><button class="btn btn-line" data-open-lead data-interest="PAMM / MAM">Talk to us</button></div>
+      <div class="partner"><span class="kind">Copy trading</span><h3>Social Trading</h3><p>Publish your strategy and earn performance fees when followers copy your trades.</p><button class="btn btn-line" data-open-lead data-interest="Social trading">Become a provider</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== FAQ =================== -->
+<section class="block platform" id="faq">
+  <div class="wrap faq-grid">
+    <div class="intro"><span class="eyebrow">FAQ</span><h2>Questions before you start.</h2><p>Our team answers on WhatsApp and at support@abselmarkets.com, Monday to Friday.</p><button class="btn btn-cta" data-open-lead>Request a call back</button></div>
+    <div>
+      <details><summary>Who will hold my account?</summary><p>Your account is opened with Absel Markets, licensed by the Financial Services Commission of Mauritius under licence no. GB25205423. Absel Global is Absel Markets' client registration site.</p></details>
+      <details><summary>Is my money safe?</summary><p>Client funds are held in segregated bank accounts, separate from Absel Markets' own operational funds, as the FSC requires. Professional indemnity insurance adds a further layer of protection. Trading itself carries risk and you can lose money.</p></details>
+      <details><summary>STP or ECN: which should I choose?</summary><p>STP has no commission, with spreads from 0.9 pips. ECN offers raw spreads from 0.2 pips plus a commission from $7 per lot. Scalpers, EA users and high-volume traders usually prefer ECN.</p></details>
+      <details><summary>Which platform will I trade on?</summary><p>MetaTrader 5 on Windows, in your web browser, and on iOS and Android, with optional VPS hosting for Expert Advisors.</p></details>
+      <details><summary>Do you offer swap-free accounts?</summary><p>Yes. Islamic accounts are Sharia-compliant with no overnight swap charges.</p></details>
+      <details><summary>How do I deposit?</summary><p>Visa, Mastercard, bank wire, USDT, Skrill, Neteller and UnionPay. Absel Markets charges 0% on deposits.</p></details>
+      <details><summary>Which countries can't open an account?</summary><p>Absel Markets does not accept residents of the United Arab Emirates, United States, Canada, Singapore, Cuba, Eritrea, Myanmar, Iran, North Korea, Kyrgyzstan, Syria, Liberia, Yemen, Somalia, Jamaica, Albania, Barbados, Cambodia or Panama.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- =================== FINAL CTA =================== -->
+<section class="final">
+  <div class="wrap">
+    <div><h2>Your account manager is one call away.</h2><p>Leave your number and we'll help you open, verify and fund your account.</p></div>
+    <div class="hero-ctas" style="margin-top:0">
+      <button class="btn btn-white" data-open-lead>Request a call back</button>
+      <a class="btn btn-line-white" data-cfg-href="registerUrl" href="https://client.abselmarkets.com/register" target="_blank" rel="noopener">Register directly</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- =================== FOOTER =================== -->
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div>
+        <a class="logo" href="#top" aria-label="Absel Global home">
+          <img class="logo-img" src="assets/absel-global-logo-white.png" alt="Absel Global" width="133" height="56" style="height:56px">
+        </a>
+        <p style="margin-top:18px;max-width:320px">The client registration site of Absel Markets, an FX &amp; CFD broker regulated by the FSC Mauritius.</p>
+      </div>
+      <div><h4>Contact</h4>
+        <span class="c-label">Email</span><span class="contact-line">support@abselmarkets.com</span>
+        <span class="c-label">Phone</span><span class="contact-line">+230 214 4906</span>
+        <span class="c-label">WhatsApp</span><span class="contact-line">+44 7576 077989</span>
+      </div>
+      <div><h4>Office</h4><p>Level 6, Ken Lee Building<br>20 Edith Cavell Street<br>Port-Louis 11302, Mauritius</p></div>
+      <div><h4>Legal</h4>
+        <ul>
+          <li><a href="https://abselmarkets.com/riskDisclosure" target="_blank" rel="noopener">Risk Disclosure</a></li>
+          <li><a href="https://abselmarkets.com/privacyPolicy" target="_blank" rel="noopener">Privacy Policy</a></li>
+          <li><a href="https://abselmarkets.com/termsOfUse" target="_blank" rel="noopener">Terms of Use</a></li>
+          <li><a href="https://abselmarkets.com/antiMoneyLaundering" target="_blank" rel="noopener">Anti Money Laundering</a></li>
+          <li><a href="https://abselmarkets.com/legalDocuments" target="_blank" rel="noopener">Legal Documents</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <div><h5>Regulatory status</h5><p>Absel Global (abselglobal.com) is operated by Absel Markets for client registration. Absel Markets is authorised and regulated as an Investment Dealer (Full Service Dealer, Excluding Underwriting) by the Financial Services Commission (FSC) of Mauritius under Global Business Licence No. GB25205423, Code FS-4.1 and Code SEC-2.1B. Registered office: Level 6, Ken Lee Building, 20 Edith Cavell Street, Port-Louis 11302, Mauritius.</p></div>
+      <div><h5>Risk warning</h5><p>Trading CFDs and foreign exchange on margin carries a high level of risk and may not be suitable for all investors. Leveraged products can work against you as well as for you. You may lose more than your initial deposit and you are not protected by a government compensation scheme. Make sure you fully understand the risks before trading. Absel Markets operates on an execution-only basis and nothing on this site is investment advice. Past performance is not a reliable indicator of future results.</p></div>
+      <div><h5>Restricted jurisdictions</h5><p>Services are not offered to citizens or residents of the United Arab Emirates, United States of America, Canada, Singapore, Cuba, Eritrea, Myanmar, Iran, North Korea, Kyrgyzstan, Syria, Liberia, Yemen, Somalia, Jamaica, Albania, Barbados, Cambodia or Panama, or anywhere such use would be contrary to local law.</p></div>
+    </div>
+    <div class="copy"><span>© 2026 Absel Markets. All rights reserved.</span><span>FSC Licence No. GB25205423</span></div>
+  </div>
+</footer>
+
+<!-- =================== POPUP =================== -->
+<div class="modal" id="leadModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+  <div class="modal-bg" data-close></div>
+  <div class="modal-box">
+    <button class="modal-x" data-close aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <aside class="modal-side">
+      <span class="eyebrow" style="color:#8FB0FF">Absel Markets</span>
+      <h3 id="modalTitle">Open your trading account</h3>
+      <p>An account specialist will call you to set everything up.</p>
+      <ul>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>ECN spreads from 0.2 pips</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Leverage up to 1:500</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Segregated client funds</li>
+        <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>0% deposit fees</li>
+      </ul>
+      <div class="lic">FSC MAURITIUS · GB25205423<br>FS-4.1 · SEC-2.1B</div>
+    </aside>
+    <div class="modal-main"><div class="lead-card"><div data-lead-slot="popup"></div></div></div>
+  </div>
+</div>
+
+<div class="mbar">
+  <button class="btn btn-cta" data-open-lead>Open account</button>
+  <a class="btn btn-line" data-cfg-href="loginUrl" href="https://client.abselmarkets.com" target="_blank" rel="noopener">Log in</a>
+</div>
+
+<a class="wa" id="waBtn" href="https://wa.me/447576077989" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.5-.3z"/></svg>
+</a>
+
+<!-- Form template, rendered into the hero and the popup -->
+<template id="leadTpl">
+  <div class="lf-wrap">
+    <h2 data-h>Get a call from an account specialist</h2>
+    <p class="sub">Leave your details. We call back within one business day.</p>
+    <form class="lf" novalidate>
+      <div class="field"><label data-for="fname">First name</label><input data-id="fname" autocomplete="given-name" required><span class="err" aria-live="polite"></span></div>
+      <div class="field"><label data-for="lname">Last name</label><input data-id="lname" autocomplete="family-name" required><span class="err" aria-live="polite"></span></div>
+      <div class="field full"><label data-for="email">Email</label><input data-id="email" type="email" autocomplete="email" required><span class="err" aria-live="polite"></span></div>
+      <div class="field"><label data-for="country">Country of residence</label><select data-id="country" required></select><span class="err" aria-live="polite"></span></div>
+      <div class="field"><label data-for="city">City</label><input data-id="city" autocomplete="address-level2" required><span class="err" aria-live="polite"></span></div>
+      <div class="field full"><label data-for="phone">Phone (WhatsApp preferred)</label><div class="phone"><input data-id="dial" aria-label="Country code" value="+" inputmode="tel"><input data-id="phone" type="tel" autocomplete="tel-national" required></div><span class="err" aria-live="polite"></span></div>
+      <div class="field"><label data-for="interest">Interested in</label>
+        <select data-id="interest"><option>ECN account</option><option>STP account</option><option>Islamic (swap-free) account</option><option>Cent account</option><option>Introducing Broker (IB)</option><option>PAMM / MAM</option><option>Social trading</option></select></div>
+      <div class="field"><label data-for="exp">Experience</label>
+        <select data-id="exp"><option>New to trading</option><option>Under 1 year</option><option>1–3 years</option><option>3+ years</option></select></div>
+      <div class="restricted" hidden>Absel Markets does not accept clients resident in <b class="rname"></b>, so we can't open an account for you.</div>
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+      <label class="check"><input type="checkbox" data-id="consent"><span>I agree to be contacted by Absel Markets about opening an account and have read the <a href="https://abselmarkets.com/privacyPolicy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+      <p class="send-err" hidden></p>
+      <button class="btn btn-cta" type="submit">Request my call back</button>
+      <p class="risk">CFDs are leveraged and high risk. You may lose more than your deposit. Accounts are opened with Absel Markets, regulated by the FSC Mauritius.</p>
+    </form>
+    <div class="trust-row">
+      <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>FSC regulated</span>
+      <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>SSL secured</span>
+      <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>No spam</span>
+    </div>
+  </div>
+  <div class="done" hidden>
+    <div class="tick"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
+    <h3>Thanks, <span class="dname"></span>. Your request is in.</h3>
+    <p>An Absel Markets account specialist will contact you within one business day. Want to skip the wait? Start your registration now.</p>
+    <div class="hero-ctas" style="margin-top:20px">
+      <a class="btn btn-cta reg-link" href="https://client.abselmarkets.com/register" target="_blank" rel="noopener">Register now</a>
+      <a class="btn btn-line wa-link" href="https://wa.me/447576077989" target="_blank" rel="noopener">WhatsApp us</a>
+    </div>
+    <p class="ref"></p>
+  </div>
+</template>
+
+<script>
+(function(){
+  var CFG=window.ABSEL_CONFIG||{};
+  var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+  function store(k,v){try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){return null}}
+  var reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* config links */
+  $$("[data-cfg-href]").forEach(function(a){var v=CFG[a.dataset.cfgHref];if(v)a.href=v});
+  if(CFG.whatsapp) $("#waBtn").href="https://wa.me/"+CFG.whatsapp;
+
+  /* ---------- Countries ---------- */
+  var RESTRICTED=["United Arab Emirates","United States","Canada","Singapore","Cuba","Eritrea","Myanmar","Iran","North Korea","Kyrgyzstan","Syria","Liberia","Yemen","Somalia","Jamaica","Albania","Barbados","Cambodia","Panama"];
+  var COUNTRIES=[["Algeria","+213"],["Argentina","+54"],["Australia","+61"],["Austria","+43"],["Azerbaijan","+994"],["Bahrain","+973"],["Bangladesh","+880"],["Belgium","+32"],["Botswana","+267"],["Brazil","+55"],["Bulgaria","+359"],["Cameroon","+237"],["Chile","+56"],["China","+86"],["Colombia","+57"],["Croatia","+385"],["Cyprus","+357"],["Czech Republic","+420"],["Denmark","+45"],["Egypt","+20"],["Estonia","+372"],["Ethiopia","+251"],["Finland","+358"],["France","+33"],["Georgia","+995"],["Germany","+49"],["Ghana","+233"],["Greece","+30"],["Hong Kong","+852"],["Hungary","+36"],["India","+91"],["Indonesia","+62"],["Iraq","+964"],["Ireland","+353"],["Italy","+39"],["Ivory Coast","+225"],["Japan","+81"],["Jordan","+962"],["Kazakhstan","+7"],["Kenya","+254"],["Kuwait","+965"],["Latvia","+371"],["Lebanon","+961"],["Lithuania","+370"],["Malaysia","+60"],["Maldives","+960"],["Malta","+356"],["Mauritius","+230"],["Mexico","+52"],["Mongolia","+976"],["Morocco","+212"],["Mozambique","+258"],["Namibia","+264"],["Nepal","+977"],["Netherlands","+31"],["New Zealand","+64"],["Nigeria","+234"],["Norway","+47"],["Oman","+968"],["Pakistan","+92"],["Peru","+51"],["Philippines","+63"],["Poland","+48"],["Portugal","+351"],["Qatar","+974"],["Romania","+40"],["Rwanda","+250"],["Saudi Arabia","+966"],["Senegal","+221"],["Serbia","+381"],["Seychelles","+248"],["Slovakia","+421"],["Slovenia","+386"],["South Africa","+27"],["South Korea","+82"],["Spain","+34"],["Sri Lanka","+94"],["Sweden","+46"],["Switzerland","+41"],["Taiwan","+886"],["Tanzania","+255"],["Thailand","+66"],["Tunisia","+216"],["Turkey","+90"],["Uganda","+256"],["Ukraine","+380"],["United Kingdom","+44"],["Uzbekistan","+998"],["Vietnam","+84"],["Zambia","+260"],["Zimbabwe","+263"],
+    ["United Arab Emirates","+971"],["United States","+1"],["Canada","+1"],["Singapore","+65"],["Cuba","+53"],["Eritrea","+291"],["Myanmar","+95"],["Iran","+98"],["North Korea","+850"],["Kyrgyzstan","+996"],["Syria","+963"],["Liberia","+231"],["Yemen","+967"],["Somalia","+252"],["Jamaica","+1"],["Albania","+355"],["Barbados","+1"],["Cambodia","+855"],["Panama","+507"]];
+  COUNTRIES.sort(function(a,b){return a[0].localeCompare(b[0])});
+
+  /* ---------- UTM attribution ---------- */
+  var utm={};try{var q=new URLSearchParams(location.search);["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid","fbclid","ref"].forEach(function(k){if(q.get(k))utm[k]=q.get(k)});if(Object.keys(utm).length)store("ag_utm",JSON.stringify(utm));else utm=JSON.parse(store("ag_utm")||"{}")}catch(e){}
+
+  /* ---------- Build a form instance ---------- */
+  var forms={};
+  function buildForm(slot,prefix,heading){
+    var node=document.importNode($("#leadTpl").content,true);
+    $$("[data-id]",node).forEach(function(el){el.id=prefix+"-"+el.dataset.id});
+    $$("[data-for]",node).forEach(function(el){el.setAttribute("for",prefix+"-"+el.dataset.for)});
+    if(heading) $("[data-h]",node).textContent=heading;
+    if(prefix==="pop") $("[data-h]",node).id="popHeading";
+    slot.appendChild(node);
+    var root=slot, f=$("form",root), g=function(id){return $("#"+prefix+"-"+id,root)};
+    var sel=g("country"), dial=g("dial"), btn=$("button[type=submit]",f), rmsg=$(".restricted",f);
+    var o=document.createElement("option");o.value="";o.textContent="Select your country";sel.appendChild(o);
+    COUNTRIES.forEach(function(c){var op=document.createElement("option");op.value=c[0];op.dataset.dial=c[1];op.textContent=c[0];sel.appendChild(op)});
+    var ot=document.createElement("option");ot.value="Other";ot.dataset.dial="+";ot.textContent="Other";sel.appendChild(ot);
+    function setErr(input,msg){var fl=input.closest(".field");fl.classList.toggle("invalid",!!msg);$(".err",fl).textContent=msg||""}
+    sel.addEventListener("change",function(){
+      var op=sel.options[sel.selectedIndex];if(op&&op.dataset.dial)dial.value=op.dataset.dial;
+      var blocked=RESTRICTED.indexOf(sel.value)>-1;rmsg.hidden=!blocked;$(".rname",rmsg).textContent=sel.value;btn.disabled=blocked;setErr(sel,"");
+    });
+    ["fname","lname","email","phone","city"].forEach(function(id){g(id).addEventListener("input",function(){setErr(this,"")})});
+    g("consent").addEventListener("change",function(){this.parentElement.classList.remove("invalid")});
+    function validate(){
+      var ok=true,v,first=null;
+      function chk(el,good,msg){setErr(el,good?"":msg);if(!good){ok=false;first=first||el}}
+      chk(g("fname"),!!g("fname").value.trim(),"Enter your first name");
+      chk(g("lname"),!!g("lname").value.trim(),"Enter your last name");
+      chk(g("email"),/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(g("email").value.trim()),"Enter a valid email, like name@example.com");
+      chk(sel,!!sel.value,"Select your country of residence");
+      chk(g("city"),g("city").value.trim().length>=2,"Enter your city");
+      v=g("phone").value.replace(/\D/g,"");chk(g("phone"),v.length>=6&&v.length<=14,"Enter your number without the country code");
+      if(!g("consent").checked){g("consent").parentElement.classList.add("invalid");ok=false;first=first||g("consent")}
+      if(first)first.focus();return ok;
+    }
+    f.addEventListener("submit",function(e){
+      e.preventDefault();var serr=$(".send-err",f);serr.hidden=true;
+      if(RESTRICTED.indexOf(sel.value)>-1||!validate())return;
+      var lead={firstName:g("fname").value.trim(),lastName:g("lname").value.trim(),email:g("email").value.trim(),country:sel.value,city:g("city").value.trim(),dialCode:dial.value.trim(),phone:g("phone").value.trim(),interest:g("interest").value,experience:g("exp").value,consent:true,form:prefix==="pop"?"popup":"hero",page:location.href,utm:utm,website:$(".hp",f).value};
+      btn.disabled=true;btn.textContent="Sending…";
+      function finish(ref){
+        lead.reference=ref||("AG-"+Date.now().toString(36).toUpperCase().slice(-6));
+        store("ag_lead","1");
+        Object.keys(forms).forEach(function(k){var w=forms[k];$(".dname",w.slot).textContent=lead.firstName;$(".ref",w.slot).textContent="Reference: "+lead.reference;$(".lf-wrap",w.slot).hidden=true;$(".done",w.slot).hidden=false});
+        $$(".reg-link").forEach(function(a){if(CFG.registerUrl)a.href=CFG.registerUrl});
+        $$(".wa-link").forEach(function(a){if(CFG.whatsapp)a.href="https://wa.me/"+CFG.whatsapp});
+        try{(window.dataLayer=window.dataLayer||[]).push({event:"generate_lead",lead_form:lead.form,interest:lead.interest,country:lead.country});if(window.fbq)fbq("track","Lead");if(window.gtag)gtag("event","generate_lead")}catch(e){}
+      }
+      function fail(msg){btn.disabled=false;btn.textContent="Request my call back";serr.textContent=msg||"We couldn't send your details. Check your connection and try again, or message us on WhatsApp.";serr.hidden=false}
+      var FIELD={firstName:"fname",lastName:"lname",email:"email",phone:"phone",country:"country",city:"city"};
+      function showErrors(errs){var first=null;Object.keys(errs||{}).forEach(function(k){var el=FIELD[k]&&g(FIELD[k]);if(el){setErr(el,errs[k]);first=first||el}else if(k==="consent"){g("consent").parentElement.classList.add("invalid")}});if(first)first.focus()}
+      var send=typeof window.ABSEL_SUBMIT==="function"?window.ABSEL_SUBMIT(lead):(CFG.leadEndpoint?fetch(CFG.leadEndpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lead)}).then(function(r){return r.json().catch(function(){return{}}).then(function(d){d.status=r.status;return d})}):Promise.resolve({ok:true}));
+      Promise.resolve(send).then(function(d){
+        if(d&&d.ok){finish(d.reference);return}
+        btn.disabled=false;btn.textContent="Request my call back";
+        if(d&&d.errors){showErrors(d.errors);return}
+        fail(d&&d.error);
+      }).catch(function(){fail()});
+    });
+    forms[prefix]={slot:slot,setInterest:function(v){g("interest").value=v},first:function(){return g("fname")}};
+  }
+  buildForm($('[data-lead-slot="hero"]'),"hero");
+  buildForm($('[data-lead-slot="popup"]'),"pop","Get your account set up");
+
+  /* ---------- Popup ---------- */
+  var modal=$("#leadModal"), lastFocus=null, autoShown=store("ag_auto")==="1";
+  function openModal(interest){
+    if(interest)forms.pop.setInterest(interest);
+    lastFocus=document.activeElement;modal.hidden=false;document.body.classList.add("locked");
+    store("ag_auto","1");autoShown=true;
+    setTimeout(function(){var el=store("ag_lead")==="1"?$(".modal-x"):forms.pop.first();el&&el.focus({preventScroll:true})},60);
+  }
+  function closeModal(){modal.hidden=true;document.body.classList.remove("locked");if(lastFocus&&lastFocus.focus)lastFocus.focus({preventScroll:true})}
+  $$("[data-open-lead]").forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();openModal(b.dataset.interest)})});
+  $$("[data-close]",modal).forEach(function(b){b.addEventListener("click",closeModal)});
+  document.addEventListener("keydown",function(e){
+    if(modal.hidden)return;
+    if(e.key==="Escape")closeModal();
+    if(e.key==="Tab"){var f=$$("a[href],button:not([disabled]),input,select",modal).filter(function(x){return x.offsetParent!==null});if(!f.length)return;var a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}}
+  });
+  function heroBusy(){var h=$('[data-lead-slot="hero"]');return h.contains(document.activeElement)}
+  function autoOpen(){if(window.ABSEL_SUPPRESS_POPUP&&window.ABSEL_SUPPRESS_POPUP())return;if(autoShown||store("ag_lead")==="1"||!modal.hidden||heroBusy())return;openModal()}
+  if(CFG.popupDelaySeconds>0)setTimeout(autoOpen,CFG.popupDelaySeconds*1000);
+  if(CFG.exitIntent&&matchMedia("(pointer:fine)").matches)document.addEventListener("mouseout",function(e){if(!e.relatedTarget&&e.clientY<8)autoOpen()});
+
+  /* ---------- Ticker: static fallback + TradingView live tape ---------- */
+  var SYMS=[["EUR/USD","FX"],["GBP/USD","FX"],["USD/JPY","FX"],["XAU/USD","GOLD"],["XAG/USD","SILVER"],["US OIL","ENERGY"],["S&P 500","INDEX"],["NASDAQ 100","INDEX"],["DAX 40","INDEX"],["FTSE 100","INDEX"],["BTC/USD","CRYPTO"],["ETH/USD","CRYPTO"],["AUD/USD","FX"],["USD/CHF","FX"]];
+  var tape=$(".tape"),html=SYMS.map(function(s){return "<span>"+s[0].replace("&","&amp;")+" <em>"+s[1]+"</em></span>"}).join("");tape.innerHTML=html+html;
+  if(CFG.liveTicker){
+    var box=$("#tvTicker"),inner=document.createElement("div");inner.className="tradingview-widget-container__widget";box.className="tradingview-widget-container";box.appendChild(inner);
+    var sc=document.createElement("script");sc.src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js";sc.async=true;
+    sc.text=JSON.stringify({symbols:[{proName:"FX:EURUSD",title:"EUR/USD"},{proName:"FX:GBPUSD",title:"GBP/USD"},{proName:"FX:USDJPY",title:"USD/JPY"},{proName:"OANDA:XAUUSD",title:"Gold"},{proName:"TVC:USOIL",title:"US Oil"},{proName:"FOREXCOM:SPXUSD",title:"S&P 500"},{proName:"FOREXCOM:NSXUSD",title:"Nasdaq 100"},{proName:"BITSTAMP:BTCUSD",title:"Bitcoin"},{proName:"BITSTAMP:ETHUSD",title:"Ethereum"}],showSymbolLogo:true,isTransparent:true,displayMode:"adaptive",colorTheme:"dark",locale:"en"});
+    sc.onload=function(){setTimeout(function(){if(box.querySelector("iframe"))$("#tapeFallback").hidden=true},1500)};
+    box.appendChild(sc);
+  }
+
+  /* ---------- Markets tabs ---------- */
+  var MK=[
+    {k:"Forex",t:"Forex",d:"70+ major, minor and exotic currency pairs with leverage up to 1:500.",pts:["Raw ECN spreads from 0.2 pips","Trade 24 hours, Monday to Friday","Majors, minors and exotics"],rows:[["EUR/USD","Euro vs US Dollar"],["GBP/USD","Pound vs US Dollar"],["USD/JPY","US Dollar vs Yen"],["AUD/USD","Aussie vs US Dollar"],["USD/ZAR","US Dollar vs Rand"]]},
+    {k:"Commodities",t:"Commodities",d:"Gold, silver, oil and agricultural CFDs to diversify or hedge.",pts:["Spot gold and silver","Crude oil CFDs","Long or short in one click"],rows:[["XAU/USD","Gold vs US Dollar"],["XAG/USD","Silver vs US Dollar"],["USOIL","WTI Crude Oil"],["UKOIL","Brent Crude Oil"]]},
+    {k:"Indices",t:"Indices",d:"Trade the direction of the world's leading stock markets.",pts:["US, UK and European benchmarks","No need to buy every stock","Go long or short"],rows:[["US500","S&P 500"],["NAS100","Nasdaq 100"],["GER40","DAX 40"],["UK100","FTSE 100"]]},
+    {k:"Futures",t:"Futures",d:"Energy, metals and index futures CFDs on MT5.",pts:["Energy and metals futures","Index futures","Margin-based trading"],rows:[["Energy","Oil and gas futures"],["Metals","Gold and silver futures"],["Index","Equity index futures"]]},
+    {k:"Crypto",t:"Crypto CFDs",d:"Trade price moves in major cryptocurrencies without a wallet.",pts:["No crypto wallet needed","Go long or short","Trade with MT5 tools"],rows:[["BTC/USD","Bitcoin"],["ETH/USD","Ethereum"],["XRP/USD","Ripple"]]}
+  ];
+  var tabs=$(".mk-tabs"),panel=$("#mkPanel");
+  function showMk(i){
+    $$("button",tabs).forEach(function(b,j){b.setAttribute("aria-selected",j===i?"true":"false");b.tabIndex=j===i?0:-1});
+    var m=MK[i];
+    panel.innerHTML='<div class="mk-info"><span class="eyebrow">'+m.k+'</span><h3 style="margin-top:12px">'+m.t+'</h3><p>'+m.d+'</p><ul>'+m.pts.map(function(p){return"<li>"+p+"</li>"}).join("")+'</ul><button class="btn btn-cta" data-mk>Trade '+m.t+'</button></div><div class="mk-table"><table><thead><tr><th>Instrument</th><th>Description</th><th></th></tr></thead><tbody>'+m.rows.map(function(r){return'<tr><td class="sym">'+r[0]+'</td><td>'+r[1]+'</td><td class="act"><button class="mini-btn" data-mk>Trade</button></td></tr>'}).join("")+'</tbody></table></div>';
+    $$("[data-mk]",panel).forEach(function(b){b.addEventListener("click",function(){openModal()})});
+  }
+  MK.forEach(function(m,i){var b=document.createElement("button");b.setAttribute("role","tab");b.textContent=m.k;b.addEventListener("click",function(){showMk(i)});
+    b.addEventListener("keydown",function(e){if(e.key==="ArrowRight"||e.key==="ArrowLeft"){var n=(i+(e.key==="ArrowRight"?1:MK.length-1))%MK.length;showMk(n);$$("button",tabs)[n].focus()}});tabs.appendChild(b)});
+  showMk(0);
+
+  /* ---------- Decorative candles (illustrative, not market data) ---------- */
+  var cc=$("#candles");
+  function drawCandles(){
+    if(!cc)return;var w=cc.clientWidth,h=cc.clientHeight,d=Math.min(devicePixelRatio||1,2);cc.width=w*d;cc.height=h*d;var x=cc.getContext("2d");x.scale(d,d);
+    var cs=getComputedStyle(document.documentElement),up=cs.getPropertyValue("--up").trim(),dn=cs.getPropertyValue("--down").trim();
+    x.strokeStyle="rgba(238,242,250,.07)";for(var gy=1;gy<4;gy++){x.beginPath();x.moveTo(0,gy*h/4);x.lineTo(w,gy*h/4);x.stroke()}
+    var n=Math.floor(w/12),p=h*.55,seed=7;function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647}
+    for(var i=0;i<n;i++){var o=p,c=p+(rnd()-.47)*h*.12;c=Math.max(h*.15,Math.min(h*.85,c - (i/n)*1.2));var hi=Math.min(o,c)-rnd()*h*.05,lo=Math.max(o,c)+rnd()*h*.05;
+      var col=c<o?up:dn,cx=i*12+6;x.strokeStyle=col;x.fillStyle=col;x.beginPath();x.moveTo(cx,hi);x.lineTo(cx,lo);x.stroke();x.fillRect(cx-3.5,Math.min(o,c),7,Math.max(1.5,Math.abs(c-o)));p=c}
+  }
+  drawCandles();addEventListener("resize",function(){clearTimeout(drawCandles.t);drawCandles.t=setTimeout(drawCandles,150)});
+
+  /* ---------- Globe ---------- */
+  var cv=$("#globe");if(!cv||!cv.getContext)return;
+  var ctx=cv.getContext("2d"),dpr=Math.min(devicePixelRatio||1,2),S=640;cv.width=S*dpr;cv.height=S*dpr;ctx.scale(dpr,dpr);
+  var pts=[];for(var lat=-80;lat<=80;lat+=8){var n=Math.max(6,Math.round(42*Math.cos(lat*Math.PI/180)));for(var i=0;i<n;i++)pts.push([lat*Math.PI/180,i/n*Math.PI*2])}
+  var rot=.6,R=270,cx=S/2,cy=S/2,tilt=-.35;
+  function draw(){ctx.clearRect(0,0,S,S);ctx.strokeStyle="rgba(238,242,250,.09)";ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.stroke();
+    for(var k=0;k<pts.length;k++){var la=pts[k][0],lo=pts[k][1]+rot,X=Math.cos(la)*Math.sin(lo),Y=Math.sin(la),Z=Math.cos(la)*Math.cos(lo),y2=Y*Math.cos(tilt)-Z*Math.sin(tilt),z2=Y*Math.sin(tilt)+Z*Math.cos(tilt);if(z2<0)continue;
+      var hl=k%19===0;ctx.globalAlpha=.12+z2*.7;ctx.fillStyle=hl?"#8FB0FF":"#EEF2FA";ctx.beginPath();ctx.arc(cx+X*R,cy-y2*R,hl?2.3:1.2,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
+  function loop(){rot+=.0015;draw();requestAnimationFrame(loop)}
+  draw();if(!reduce)requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
