@@ -55,6 +55,7 @@
 
   const I = (p, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
   const ICONS = {
+    route: I('<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/>'),
     idcard: I('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16a3.4 3.4 0 0 1 6.4 0M14 10h4M14 13h3"/>'), bank: I('<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>'),
     gift: I('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>'), play: I('<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M10 8l5 3-5 3z"/><path d="M8 21h8"/>'),
     day: I('<path d="M3 12h4l3-8 4 16 3-8h4"/>'), phone: I('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
@@ -181,24 +182,29 @@
 
   /* --------------------------------------------------------------- shell */
   // Two workspaces. Each item: [route, label, icon, who can see it, badge key]
+  // The brokerage lifecycle: acquire → sell → onboard → fund → trade → retain. Every route from earlier versions is kept.
+  const seesBiz = () => isMgr() || isMktMgr() || isOps();
   const NAV = [
-    ["Sales", [["queue", "My day", "day", isSales, "queue"], ["call", "Calling mode", "phone", isSales], ["inbox", "Inbox", "inbox", isSales, "inbox"], ["leads", "Leads", "list", isSales], ["tasks", "Follow-ups", "check", isSales], ["pipeline", "Deposit pipeline", "funnel", isSales], ["deposits", "Deposits", "cash", isSales, "deposits"], ["bonus", "Demo & $100", "gift", isSales, "bonus"], ["targets", "Targets", "target", isSales]]],
+    ["Overview", [["overview", "Business overview", "grid", seesBiz], ["dashboard", "Sales dashboard", "chart", isSales], ["ops", "Operations desk", "check", isKyc]]],
+    ["Acquisition", [["mkt", "Marketing overview", "pie", isMkt], ["campaigns", "Campaigns & spend", "megaphone", isMkt], ["broadcasts", "Broadcasts", "send", isMkt, "broadcasts"], ["sources", "Lead sources", "plug", isMkt], ["leads", "Leads (view only)", "list", () => isMkt() && !isSales()]]],
+    ["Sales", [["queue", "My day", "day", isSales, "queue"], ["call", "Calling mode", "phone", isSales], ["inbox", "Inbox", "inbox", isSales, "inbox"], ["leads", "Leads", "list", isSales], ["lifecycle", "Client journey", "route", () => isSales() || isMktMgr()], ["tasks", "Follow-ups", "check", isSales], ["pipeline", "Deposit pipeline", "funnel", isSales], ["bonus", "Demo & $100", "gift", isSales, "bonus"], ["targets", "Targets", "target", isSales]]],
     ["Sales management", [["live", "Team live", "live", isMgr], ["quality", "Call quality", "star", isSales, "reviews"], ["hygiene", "Lead hygiene", "broom", isMgr], ["territories", "Territories", "map", isMgr]]],
-    ["Marketing", [["mkt", "Marketing overview", "pie", isMkt], ["campaigns", "Campaigns & spend", "megaphone", isMkt], ["broadcasts", "Broadcasts", "send", isMkt, "broadcasts"], ["sources", "Lead sources", "plug", isMkt], ["leads", "Leads (view only)", "list", () => isMkt() && !isSales()]]],
+    ["Clients & onboarding", [["clients", "Clients", "users", () => isKyc() || isSales()], ["kyc", "KYC review", "idcard", isKyc, "kyc"], ["openacc", "Account opening", "bank", isOps, "accounts"]]],
+    ["Funding", [["money", "Deposits & withdrawals", "cash", () => isOps() || isMgr(), "money"], ["deposits", "FTD verification", "cash", isSales, "deposits"]]],
+    ["Trading", [["trading", "Trading accounts", "chart", () => isOps() || isMgr() || isKyc()], ["balances", "Trading data import", "upload", isOps]]],
     ["Communication", [["templates", "Templates", "mail", () => canComm() || isMkt()], ["automations", "Automations", "bolt", () => canComm() || isMkt()], ["messages", "Message log", "msg", () => canComm() || isMkt()], ["optouts", "Opt-outs & DNC", "shield", () => isMgr() || isMkt()]]],
-    ["Operations", [["ops", "Ops overview", "grid", isKyc], ["kyc", "KYC review", "idcard", isKyc, "kyc"], ["openacc", "Account opening", "bank", isOps, "accounts"], ["money", "Client money", "cash", isOps, "money"], ["clients", "Clients", "users", () => isKyc() || isSales()], ["balances", "Balance import", "upload", isOps], ["portalsettings", "Client area settings", "gear", isAdmin]]],
-    ["Insights", [["dashboard", "Dashboard", "grid", () => isSales() || isMkt()], ["reports", "Reports & MIS", "chart", () => isSales() || isMkt()]]],
-    ["Admin", [["team", "Team", "users", () => isMgr() || isMktMgr()], ["import", "Import leads", "upload", () => isMgr() || isMktMgr()], ["settings", "Settings", "gear", isAdmin]]],
+    ["Reports", [["reports", "Reports & MIS", "chart", () => isSales() || isMkt() || isOps()]]],
+    ["Admin", [["team", "Team", "users", () => isMgr() || isMktMgr()], ["import", "Import leads", "upload", () => isMgr() || isMktMgr()], ["settings", "Settings", "gear", isAdmin], ["portalsettings", "Client area settings", "gear", isAdmin]]],
   ];
   const ACCESS = {}; NAV.forEach(([, items]) => items.forEach(i => { const prev = ACCESS[i[0]]; ACCESS[i[0]] = prev ? () => prev() || i[3]() : i[3]; }));
   ACCESS.lead = () => true;
-  const home = () => (isMgr() ? "dashboard" : isSales() ? "queue" : isMkt() ? "mkt" : isOps() ? "ops" : isKyc() ? "kyc" : "dashboard");
+  const home = () => (isMgr() ? "overview" : isSales() ? "queue" : isMkt() ? "mkt" : isOps() ? "ops" : isKyc() ? "kyc" : "overview");
   C.home = home;
   function shell() {
     const u = C.state.user, m = C.state.meta;
     const nav = NAV.map(([g, items]) => { const vis = items.filter(i => i[3]()); return vis.length ? `<h6>${g}</h6>` + vis.map(([k, l, ic, , badge]) => `<a href="${C.href(k)}" data-nav="${k}">${ICONS[ic]}<span>${l}</span>${badge ? `<b data-badge="${badge}" hidden></b>` : ""}</a>`).join("") : ""; }).join("");
     const ws = isAdmin() ? "Admin" : isSales() && isMkt() ? "Sales + Marketing" : isMkt() ? "Marketing workspace" : isOps() ? "Operations" : isKyc() ? "Compliance" : "Sales workspace";
-    $("#crm").innerHTML = `<div class="c-shell"><aside class="c-side"><div class="c-logo"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="128" height="54"><small>CRM · ${esc(ws.toUpperCase())}</small></div><nav class="c-nav" aria-label="CRM">${nav}</nav><div class="c-me"><b>${esc(u.name)}</b><span>${esc(roleLabel(u.role))}</span>${u.sample ? '<span style="display:block;color:#8FA0C8;font-size:11.5px;margin-top:4px">Sample account</span>' : ""}</div></aside><div class="c-scrim" data-act="closenav"></div>
+    $("#crm").innerHTML = `<div class="c-shell"><aside class="c-side"><div class="c-logo"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="128" height="54"><small>BACK OFFICE · ${esc(ws.toUpperCase())}</small></div><nav class="c-nav" aria-label="CRM">${nav}</nav><div class="c-me"><b>${esc(u.name)}</b><span>${esc(roleLabel(u.role))}</span>${u.sample ? '<span style="display:block;color:#8FA0C8;font-size:11.5px;margin-top:4px">Sample account</span>' : ""}</div></aside><div class="c-scrim" data-act="closenav"></div>
       <div class="c-main"><header class="c-top"><button class="c-btn ghost c-burger" data-act="opennav" aria-label="Menu">${ICONS.menu}</button><h1 id="cTitle"></h1><span class="sp"></span>
       <input class="c-in c-search" id="cSearch" type="search" placeholder="Search name, phone, email, ref" aria-label="Search leads">
       ${isSales() && u.role !== "admin" ? `<div style="position:relative"><button class="c-btn sm c-status" id="cStatus"></button></div>` : ""}
@@ -295,7 +301,7 @@
     try {
       const prev = C.state.meta ? C.state.meta.unread : 0, m = await API.call("meta"); C.state.meta = m; C.state.user = m.user; setUnread(m.unread); drawBadges(); if (m.gate) boot();
       if (m.unread > prev && document.hidden && "Notification" in window && Notification.permission === "granted") {
-        API.call("listNotifications").then(list => { const n = list.find(x => !x.read); if (n) { const nt = new Notification("Absel CRM", { body: n.text, tag: n.id }); nt.onclick = () => { window.focus(); if (n.lead_id) C.go("lead/" + n.lead_id); }; } }).catch(() => {});
+        API.call("listNotifications").then(list => { const n = list.find(x => !x.read); if (n) { const nt = new Notification("Absel back office", { body: n.text, tag: n.id }); nt.onclick = () => { window.focus(); if (n.lead_id) C.go("lead/" + n.lead_id); }; } }).catch(() => {});
       }
     } catch (e) { if (e.auth) return loginScreen("Your session ended. Please sign in again."); }
   }
@@ -314,7 +320,7 @@
     const page = $("#cPage"); const seq = ++renderSeq; page.onclick = null;
     page.innerHTML = '<p class="muted">Loading…</p>';
     $("#cTitle").textContent = view.title || "";
-    document.title = (view.title ? view.title + " · " : "") + "Absel CRM";
+    document.title = (view.title ? view.title + " · " : "") + "Absel back office";
     C.current = { view, r, seq };
     try { await view.render(page, r, () => seq === renderSeq); }
     catch (e) { if (e.auth) return loginScreen("Your session ended. Please sign in again."); if (e.gate) return boot(); if (seq === renderSeq) page.innerHTML = `<div class="c-card"><b>Couldn't load this page.</b><p class="muted">${esc(e.message)}</p></div>`; }
@@ -330,7 +336,7 @@
 
   function loginScreen(msg) {
     if (unsub) { unsub(); unsub = null; }
-    $("#crm").innerHTML = `<div class="c-login"><form id="cLogin" novalidate><div class="c-logo login" style="padding:0"><img src="/assets/absel-global-logo.png" alt="Absel Global" width="128" height="54"><small style="color:var(--muted)">CRM · TEAM SIGN-IN</small></div><h1>Sign in</h1>
+    $("#crm").innerHTML = `<div class="c-login"><form id="cLogin" novalidate><div class="c-logo login" style="padding:0"><img src="/assets/absel-global-logo.png" alt="Absel Global" width="128" height="54"><small style="color:var(--muted)">BACK OFFICE · TEAM SIGN-IN</small></div><h1>Sign in</h1>
       <div id="cStep1">${field("Username", '<input class="c-in" name="u" autocomplete="username" autocapitalize="none" spellcheck="false" required>')}<div style="height:12px"></div>${field("Password", '<input class="c-in" type="password" name="p" autocomplete="current-password" required>')}</div>
       <div id="cStep2" hidden><p class="muted" style="margin-bottom:10px">Enter the 6-digit code from your authenticator app.</p>${field("Code", '<input class="c-in mono" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="font-size:18px;letter-spacing:.2em">')}</div>
       <p class="err-msg" style="color:var(--warn);font-size:13px" ${msg ? "" : "hidden"}>${esc(msg || "")}</p><button class="c-btn pri lg" type="submit">Sign in</button>

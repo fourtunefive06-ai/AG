@@ -749,6 +749,9 @@ window.ABSEL_CONFIG = {
 
   /* ---------- UTM attribution ---------- */
   var utm={};try{var q=new URLSearchParams(location.search);["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid","fbclid","ref"].forEach(function(k){if(q.get(k))utm[k]=q.get(k)});if(Object.keys(utm).length)store("ag_utm",JSON.stringify(utm));else utm=JSON.parse(store("ag_utm")||"{}")}catch(e){}
+  // Sign-up links carry the campaign so direct client-area registrations keep their source
+  function regUrl(u){try{var qs=new URLSearchParams(utm);if(!utm.landing)qs.set("landing",location.href.split("#")[0].slice(0,300));var s=qs.toString();return s&&u.indexOf("#register")>=0&&u.indexOf("?")<0?u+"?"+s:u}catch(e){return u}}
+  $$('a[href*="#register"]').forEach(function(a){a.setAttribute("href",regUrl(a.getAttribute("href")))});
 
   /* ---------- Build a form instance ---------- */
   var forms={};
@@ -792,7 +795,9 @@ window.ABSEL_CONFIG = {
         lead.reference=ref||("AG-"+Date.now().toString(36).toUpperCase().slice(-6));
         store("ag_lead","1");
         Object.keys(forms).forEach(function(k){var w=forms[k];$(".dname",w.slot).textContent=lead.firstName;$(".ref",w.slot).textContent="Reference: "+lead.reference;$(".lf-wrap",w.slot).hidden=true;$(".done",w.slot).hidden=false});
-        $$(".reg-link").forEach(function(a){if(CFG.registerUrl)a.href=CFG.registerUrl});
+        // the client area picks up the details so the sign-up matches this lead
+        try{store("ag_prefill",JSON.stringify({first_name:lead.firstName,last_name:lead.lastName,email:lead.email,country:lead.country,dial_code:lead.dialCode,phone:lead.phone}))}catch(e){}
+        $$(".reg-link").forEach(function(a){if(CFG.registerUrl)a.href=regUrl(CFG.registerUrl)});
         $$(".wa-link").forEach(function(a){if(CFG.whatsapp)a.href="https://wa.me/"+CFG.whatsapp});
         try{(window.dataLayer=window.dataLayer||[]).push({event:"generate_lead",lead_form:lead.form,interest:lead.interest,country:lead.country});if(window.fbq)fbq("track","Lead");if(window.gtag)gtag("event","generate_lead")}catch(e){}
       }

@@ -383,6 +383,44 @@ const seg = crm.previewSegment(MKT, { journey: "bonus_expired" }, "whatsapp"); a
   crm.setClientStatus(OPS, C.id, "active"); assert(!crm.portalAuthLookup(pl.email).client.locked);
   const fg = crm.portalForgot(pl.email); crm.portalReset(fg.reset_token, "New-client-pass-1"); assert.throws(() => crm.portalReset(fg.reset_token, "New-client-pass-2"), /expired/);
 }
+// lifecycle and lead capture
+{
+  const OPS = U.fatima, before = store.size("leads");
+  const lost = store.all("leads").find(l => l.stage === "lost" && l.email && !l.client_id && !l.dnc);
+  const r1 = crm.portalRegister({ first_name: lost.first_name, last_name: lost.last_name, email: lost.email, dial_code: lost.dial_code, phone: lost.phone, country: lost.country, password: "Client-pass-2026", terms: true, utm_source: "facebook", utm_campaign: "winback" });
+  assert.strictEqual(r1.client.lead_id, lost.id, "registration matched the lost lead"); assert.strictEqual(store.size("leads"), before, "no duplicate lead");
+  assert(["new", "contacted"].includes(store.get("leads", lost.id).stage), "lost lead reopened"); assert(store.get("leads", lost.id).owner_id);
+  assert(store.all("jobs").some(j => j.rule_id === "auto_portal_signup" && j.lead_id === lost.id), "sign-up automation scheduled");
+  const ph = store.all("leads").find(l => l.stage === "contacted" && !l.client_id && l.phone_key.length >= 7 && !l.dnc);
+  const r2 = crm.portalRegister({ first_name: ph.first_name, last_name: ph.last_name, email: "other." + ph.email, dial_code: ph.dial_code, phone: ph.phone, country: ph.country, password: "Client-pass-2026", terms: true });
+  assert.strictEqual(r2.client.lead_id, ph.id, "matched by phone when the email differs");
+  const r3 = crm.portalRegister({ first_name: "Direct", last_name: "Signup", email: "direct.signup@example.com", dial_code: "+254", phone: "700111222", country: "Kenya", password: "Client-pass-2026", terms: true, utm_source: "google", utm_medium: "cpc", utm_campaign: "brand", gclid: "abc", landing: "https://abselglobal.com/?utm_source=google" });
+  const nl3 = store.get("leads", r3.client.lead_id); assert(nl3 && nl3.utm_source === "google" && nl3.utm_campaign === "brand" && nl3.gclid === "abc" && nl3.owner_id, "direct sign-up becomes an attributed, assigned lead");
+  assert.strictEqual(crm.getLead(MGR, nl3.id).lifecycle.id, "registered");
+  const segs = crm.listLifecycle(MGR, { segment: "incomplete" }); assert(segs.rows.some(r => r.id === nl3.id) && segs.segments.find(x => x.id === "incomplete").n >= 1);
+  T += 25 * 3600e3; crm.tick(); assert(store.all("jobs").some(j => j.rule_id === "auto_reg_incomplete" && j.lead_id === nl3.id), "incomplete registration reminder");
+  // funded via the client area, then trading detected by the daily import
+  { const C3 = { id: r3.client.id }, PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    crm.portalVerifyEmail(r3.verify_token); crm.portalUploadKyc(C3, { kind: "kyc_id", data: PNG }); crm.portalUploadKyc(C3, { kind: "kyc_address", data: PNG });
+    assert.strictEqual(crm.getLead(MGR, nl3.id).lifecycle.id, "kyc_pending"); crm.decideKyc(U.joy, C3.id, "approved");
+    assert(store.all("jobs").some(j => j.rule_id === "auto_kyc_approved" && j.lead_id === nl3.id));
+    const a3 = crm.portalRequestAccount(C3, { type: "stp", leverage: 100 }); crm.openAccount(OPS, a3.id, { login: "7400001" }); assert.strictEqual(crm.getLead(MGR, nl3.id).lifecycle.id, "account_open");
+    const d3 = crm.portalDeposit(C3, { account_id: a3.id, method: "bank", amount: 300 }); crm.decidePayment(OPS, d3.id, "complete", { reference: "B-1" }); }
+  const fundedRow = crm.listLifecycle(MGR, { segment: "funded_not_trading" }).rows.find(r => r.id === nl3.id);
+  assert(fundedRow, "funded-not-trading list");
+  const acc = store.all("accounts").find(a => a.client_id === fundedRow.client_id && a.kind === "live" && a.status === "open");
+  T += 3 * 864e5; crm.tick(); assert(store.all("jobs").some(j => j.rule_id === "auto_funded_idle" && j.lead_id === fundedRow.id), "first-trade nudge");
+  const imp = crm.importBalances(OPS, [{ login: acc.login, balance: 999, equity: 1010, lots: 1.5 }]); assert(imp.trading === 1);
+  assert.strictEqual(crm.getLead(MGR, fundedRow.id).lifecycle.id, "trading", "trading started from import");
+  assert(crm.listTradingAccounts(OPS, {}).rows.some(r => r.login === acc.login && r.activity === "active"));
+  // merging keeps the client link
+  const dupe = crm.createLead(crm.SYSTEM, { firstName: "Dup", lastName: "Copy", email: "dup.copy@example.com", dialCode: nl3.dial_code, phone: nl3.phone, country: "Kenya" });
+  crm.mergeLeads(MGR, dupe.id, [nl3.id]); assert.strictEqual(store.get("clients", r3.client.id).lead_id, dupe.id, "client moved to the kept lead"); assert.strictEqual(store.get("leads", dupe.id).client_id, r3.client.id);
+  const legacy = store.all("leads").find(l => l.stage === "funded" && !l.client_id && l.account_id);
+  if (legacy) { const ri = crm.importBalances(OPS, [{ login: legacy.account_id, balance: 500, equity: 520 }]); assert(ri.leads === 1 && crm.getLead(MGR, legacy.id).lifecycle.id === "trading", "sales-opened accounts matched by login"); }
+  const br = crm.report(MGR, "business", { from: "2026-09-01", to: "2027-12-31" }); assert(br.kpi.registrations >= 3 && br.steps.length === 10 && br.book.length === 11 && br.queues && br.base.live_accounts > 0);
+  assert.throws(() => crm.report(U.daniel, "business", {}), /access/i);
+}
 console.log("Journey:", { demos: demos.length, credited: B.filter(b => b.credited_at).length, converted: B.filter(b => b.status === "converted").length, conversion: jr.programme.conversion + "%", cost: jr.programme.total_cost, cost_per_ftd: jr.programme.cost_per_ftd });
 console.log("Deposits:", { verified: verified.length, pending: store.all("deposits").filter(d => d.status === "pending").length, rejected: store.all("deposits").filter(d => d.status === "rejected").length }, "| reviews", store.size("reviews"), "| attendance days", store.size("attendance"), "| broadcast msgs", store.all("messages").filter(m => m.broadcast_id).length);
 console.log("✔ all checks passed");
@@ -408,6 +446,7 @@ console.log("✔ all checks passed");
     const d = crm.portalDeposit(C, { account_id: a.id, method: ["usdt", "bank", "card", "skrill"][i % 4], amount: amt, proof: { name: "receipt.png", data: PNG } });
     if (i % 6 === 1) return;                                                     // deposit waiting for operations
     crm.decidePayment(OPS, d.id, "complete", { reference: "AM-" + (880000 + i) });
+    if (i % 4 === 2 || i === 12) crm.importBalances(OPS, [{ login: String(7100000 + i), balance: amt * 1.08, equity: amt * 1.1, lots: 1.2 + i / 10 }]);
     if (i === 0) { crm.importBalances(OPS, [{ login: String(7100000 + i), balance: 3400, equity: 3350 }]); const w = crm.portalWithdraw(C, { account_id: a.id, method: "usdt", amount: 1200, details: "USDT TRC20 TQx8...9k" }); crm.decidePayment(OPS, w.id, "approve"); }
     if (i === 6) { const w = crm.portalWithdraw(C, { account_id: a.id, method: "bank", amount: 150, details: "IBAN KE12 3456 7890 · Equity Bank" }); }
   });

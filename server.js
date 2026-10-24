@@ -155,7 +155,7 @@ function readBody(req, limit = 4 * 1024 * 1024) {
 }
 async function readJson(req, limit) { const raw = await readBody(req, limit); if (!raw.length) return {}; try { return JSON.parse(raw.toString("utf8")); } catch { throw Object.assign(new Error("Invalid JSON"), { status: 400 }); } }
 
-const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8" };
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8", ".webmanifest": "application/manifest+json" };
 const PUBLIC = path.join(ROOT, "public");
 function serveFile(req, res, file, extra = {}) {
   fs.stat(file, (err, st) => {
@@ -179,7 +179,7 @@ function serveStatic(req, res, pathname) {
   if (rel.startsWith("/portal/")) {
     const file = path.normalize(path.join(PUBLIC, rel.endsWith("/") ? rel + "index.html" : rel));
     if (!file.startsWith(path.join(PUBLIC, "portal") + path.sep)) return send(res, 403, "Forbidden");
-    return serveFile(req, res, file, { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; frame-src blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" });
+    return serveFile(req, res, file, { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; frame-src blob: data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" });
   }
   if (rel.endsWith("/")) rel += "index.html";
   const file = path.normalize(path.join(PUBLIC, rel));
@@ -227,6 +227,7 @@ const RPC = {
   decideBonus: (u, id, ok, p) => crm.decideBonus(u, id, ok, p), updateBonus: (u, id, p) => crm.updateBonus(u, id, p), requestBonusWithdrawal: (u, id, a) => crm.requestBonusWithdrawal(u, id, a),
   decideBonusWithdrawal: (u, id, wid, ok, why) => crm.decideBonusWithdrawal(u, id, wid, ok, why), cancelBonus: (u, id, why) => crm.cancelBonus(u, id, why), listBonuses: (u, f) => crm.listBonuses(u, f),
   // operations back office (client area)
+  listLifecycle: (u, f) => crm.listLifecycle(u, f), markTradingStarted: (u, id) => crm.markTradingStarted(u, id), listTradingAccounts: (u, f) => crm.listTradingAccounts(u, f),
   opsOverview: u => crm.opsOverview(u), listClients: (u, f) => crm.listClients(u, f), getClient: (u, id) => crm.getClient(u, id), getClientFile: (u, id) => crm.getClientFile(u, id),
   setClientStatus: (u, id, st, why) => crm.setClientStatus(u, id, st, why), listKyc: (u, f) => crm.listKyc(u, f), decideKyc: (u, id, d, why) => crm.decideKyc(u, id, d, why),
   listAccountRequests: (u, f) => crm.listAccountRequests(u, f), openAccount: (u, id, d) => crm.openAccount(u, id, d), rejectAccount: (u, id, why) => crm.rejectAccount(u, id, why),

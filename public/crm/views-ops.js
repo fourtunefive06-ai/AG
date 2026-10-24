@@ -27,7 +27,7 @@
 
   /* ------------------------------------------------------------ overview */
   C.views.ops = {
-    title: "Operations",
+    title: "Operations desk",
     async render(page, r, alive) {
       const d = await API.call("opsOverview"); if (!alive()) return;
       const q = d.queues, m = d.money;
@@ -200,22 +200,22 @@
     const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim()); if (!lines.length) return [];
     const split = l => { const out = []; let cur = "", q = false; for (const ch of l) { if (ch === '"') q = !q; else if ((ch === "," || ch === ";" || ch === "\t") && !q) { out.push(cur); cur = ""; } else cur += ch; } out.push(cur); return out.map(s => s.trim()); };
     const head = split(lines[0]).map(h => h.toLowerCase());
-    const iL = head.findIndex(h => /login|account/.test(h)), iB = head.findIndex(h => /^balance/.test(h)), iE = head.findIndex(h => /equity/.test(h));
+    const iL = head.findIndex(h => /login|account/.test(h)), iB = head.findIndex(h => /^balance/.test(h)), iE = head.findIndex(h => /equity/.test(h)), iV = head.findIndex(h => /lots|volume/.test(h)), iT = head.findIndex(h => /last.?trade/.test(h));
     if (iL < 0 || iB < 0) throw new Error("The file needs columns named Login and Balance (Equity is optional).");
-    return lines.slice(1).map(split).map(c => ({ login: c[iL], balance: String(c[iB]).replace(/[^\d.-]/g, ""), equity: iE >= 0 ? String(c[iE]).replace(/[^\d.-]/g, "") : "" })).filter(x => x.login && x.balance !== "");
+    return lines.slice(1).map(split).map(c => ({ login: c[iL], balance: String(c[iB]).replace(/[^\d.-]/g, ""), equity: iE >= 0 ? String(c[iE]).replace(/[^\d.-]/g, "") : "", lots: iV >= 0 ? String(c[iV]).replace(/[^\d.]/g, "") : "", last_trade: iT >= 0 ? c[iT] : "" })).filter(x => x.login && x.balance !== "");
   }
   C.views.balances = {
-    title: "Balance import",
+    title: "Trading data import",
     render(page) {
-      page.innerHTML = `<div class="c-card" style="display:grid;gap:12px;max-width:760px"><h3>Import balances from Absel Markets</h3>
-        <p class="muted">Export the accounts report from MT5 Manager or the back-office as CSV with the columns <b>Login</b>, <b>Balance</b> and optionally <b>Equity</b>. Clients then see these balances, dated, in the client area, and withdrawals above the balance are blocked.</p>
+      page.innerHTML = `<div class="c-card" style="display:grid;gap:12px;max-width:760px"><h3>Import the daily trading report from Absel Markets</h3>
+        <p class="muted">Export the accounts report from MT5 Manager or the back-office as CSV. Required columns: <b>Login</b> and <b>Balance</b>. Optional: <b>Equity</b>, <b>Lots</b> (total traded) and <b>Last trade</b> (date). Clients see the dated balances in the client area, withdrawals above the balance are blocked, and trading activity marks clients as active traders (or dormant).</p>
         <input class="c-in" type="file" id="bf" accept=".csv,text/csv,text/plain"><div id="bp"></div></div><div id="br"></div>`;
       $("#bf").addEventListener("change", async e => {
         const f = e.target.files[0]; if (!f) return;
         try {
           const rows = parseCsv(await f.text());
           $("#bp").innerHTML = `<p><b>${rows.length}</b> accounts found. First: ${rows.slice(0, 3).map(x => `<span class="mono">${esc(x.login)}</span> ${money(x.balance)}`).join(" · ")}</p><button class="c-btn pri" id="bgo">Import ${rows.length} balances</button>`;
-          $("#bgo").addEventListener("click", async () => { try { const res = await API.call("importBalances", rows); $("#br").innerHTML = `<div class="c-card"><h3>Imported</h3><p>${res.updated} accounts updated.${res.unknown.length ? ` ${res.unknown.length} logins are not linked to a client (other Absel Markets clients or typos): <span class="mono">${res.unknown.slice(0, 30).map(esc).join(", ")}</span>` : ""}</p>${res.changed.length ? `<h3 style="margin-top:10px">Changed since last time <small>${res.changed.length}</small></h3><table class="c-table"><thead><tr><th>Login</th><th class="r">Before</th><th class="r">Now</th></tr></thead><tbody>${res.changed.slice(0, 50).map(c => `<tr><td class="mono">${esc(c.login)}</td><td class="num">${money(c.before)}</td><td class="num">${money(c.after)}</td></tr>`).join("")}</tbody></table>` : ""}</div>`; $("#bp").innerHTML = ""; toast("Balances imported"); } catch (err) { toast(err.message); } });
+          $("#bgo").addEventListener("click", async () => { try { const res = await API.call("importBalances", rows); $("#br").innerHTML = `<div class="c-card"><h3>Imported</h3><p>${res.updated} accounts updated${res.trading ? `, ${res.trading} with trading activity` : ""}.${res.unknown.length ? ` ${res.unknown.length} logins are not linked to a client (other Absel Markets clients or typos): <span class="mono">${res.unknown.slice(0, 30).map(esc).join(", ")}</span>` : ""}</p>${res.changed.length ? `<h3 style="margin-top:10px">Changed since last time <small>${res.changed.length}</small></h3><table class="c-table"><thead><tr><th>Login</th><th class="r">Before</th><th class="r">Now</th></tr></thead><tbody>${res.changed.slice(0, 50).map(c => `<tr><td class="mono">${esc(c.login)}</td><td class="num">${money(c.before)}</td><td class="num">${money(c.after)}</td></tr>`).join("")}</tbody></table>` : ""}</div>`; $("#bp").innerHTML = ""; toast("Balances imported"); } catch (err) { toast(err.message); } });
         } catch (err) { $("#bp").innerHTML = `<div class="c-banner warn">${esc(err.message)}</div>`; }
       });
     },

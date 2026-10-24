@@ -174,7 +174,7 @@
   C.views.queue = {
     title: "My day",
     async render(page, r, alive) {
-      const [q, tg, pl] = await Promise.all([API.call("queue"), API.call("targets", {}).catch(() => null), API.call("listPipeline", { owner: "me" }).catch(() => null)]); if (!alive()) return;
+      const [q, tg, pl, lf] = await Promise.all([API.call("queue"), API.call("targets", {}).catch(() => null), API.call("listPipeline", { owner: "me" }).catch(() => null), API.call("listLifecycle", { segment: "uncontacted", owner: "me" }).catch(() => null)]); if (!alive()) return;
       C.setQueueCount(q.dial.length);
       const sla = q.stats.sla_minutes, s = q.stats, me = tg && tg.rows.find(x => x.me);
       const sec = (title, items, empty, fn, cls = "") => `<section class="c-card ${cls}"><h3>${title} <small>${items.length}</small></h3>${items.length ? items.slice(0, 25).map(fn).join("") : `<p class="muted" style="font-size:13px">${empty}</p>`}</section>`;
@@ -188,6 +188,7 @@
         </div>
         ${me ? `<div class="c-card c-row" style="gap:18px"><div style="min-width:200px;flex:1"><span class="muted" style="font-size:12px;font-weight:700">MY FTDs THIS MONTH</span><div class="c-row" style="gap:10px;flex-wrap:nowrap;margin-top:4px"><b class="mono" style="font-size:22px">${me.ftd}${me.target_ftd ? "/" + me.target_ftd : ""}</b><div class="c-progress" style="flex:1"><i style="width:${Math.min(100, me.pct || 0)}%"></i></div></div><small class="muted">${money(me.amount)} · rank #${me.rank} of ${tg.rows.length}${me.target_ftd ? " · on pace for " + me.projection : ""}${me.pending ? " · " + me.pending + " waiting verification" : ""}</small></div>
           ${pl ? `<a class="c-btn" href="${C.href("pipeline")}">${ICONS.funnel} ${pl.rows.length} in deposit pipeline${pl.stuck ? ` · <b style="color:var(--down)">${pl.stuck} stuck</b>` : ""}</a>` : ""}<a class="c-btn" href="${C.href("targets")}">${ICONS.target} Leaderboard</a></div>` : ""}
+        ${lf ? `<div class="c-card"><h3>My clients by journey step <small><a href="${C.href("lifecycle?owner=me")}">Open client journey</a></small></h3><div class="c-attn">${lf.segments.filter(x => x.id !== "active").map(x => `<a href="${C.href("lifecycle?segment=" + x.id + "&owner=me")}" class="${x.n ? "warn" : "zero"}"><b class="mono">${num(x.n)}</b><span>${esc(x.label)}</span></a>`).join("")}</div></div>` : ""}
         <div class="c-card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:var(--brand);color:#EEF2FA;border-color:transparent">
           <div style="flex:1;min-width:220px"><h2 style="font-size:20px">${q.dial.length ? `${q.dial.length} call${q.dial.length === 1 ? "" : "s"} in your queue` : "Your queue is clear"}</h2><p style="color:#A6B0CC;margin-top:4px">${q.dial.length ? "Calling mode takes you through them in priority order: overdue follow-ups, new leads, WhatsApp replies, then hot leads." : "New leads assigned to you will appear here."}</p></div>
           ${q.dial.length ? `<a class="c-btn pri lg" href="${C.href("call")}">${ICONS.phone} Start calling</a>` : ""}
@@ -281,7 +282,7 @@
           <td><span class="mono">${fDate(x.created_at)}</span><small>${fTime(x.created_at)}</small></td>
           <td><b>${esc(x.first_name)} ${esc(x.last_name)}</b>${x.duplicate_of ? '<span class="c-tag" title="Same email or phone as an earlier lead">REPEAT</span>' : ""}${x.dnc ? '<span class="c-tag">DNC</span>' : ""}${x.sample ? '<span class="c-tag info">SAMPLE</span>' : ""}<small class="mono">${esc(x.reference)}</small></td>
           <td class="mono" style="white-space:nowrap">${esc(x.dial_code)} ${esc(x.phone)}<small>${esc(x.email)}</small></td>
-          <td>${esc(x.country)}<small>${esc(x.city || "")}</small></td><td>${esc(x.interest || "")}</td><td>${stagePill(x.stage)}<small>${x.attempts ? x.attempts + " attempt" + (x.attempts > 1 ? "s" : "") : "Not called"}</small></td>
+          <td>${esc(x.country)}<small>${esc(x.city || "")}</small></td><td>${esc(x.interest || "")}</td><td>${stagePill(x.stage)}<small>${x.attempts ? x.attempts + " attempt" + (x.attempts > 1 ? "s" : "") : "Not called"}${x.lifecycle && !["lead_new", "lead_working", "closed"].includes(x.lifecycle) ? " · " + esc((meta().lifecycle.find(z => z.id === x.lifecycle) || {}).label || "") : ""}</small></td>
           <td>${tempTag(x.temperature, x.score)}</td><td>${esc(x.owner_name)}</td><td class="mono" style="font-size:12px">${esc(x.utm_source)}<small>${esc(x.utm_campaign || "")}</small></td>
           <td>${x.next_follow_up_at ? `<span class="${Date.parse(x.next_follow_up_at) < Date.now() ? "c-wait late" : ""}">${ago(x.next_follow_up_at)}</span>` : '<span class="muted">—</span>'}</td><td>${ago(x.last_activity_at)}</td></tr>`).join("")}</tbody></table></div>
         ${res.rows.length ? "" : `<div class="c-empty"><b>No leads match</b>Try clearing filters or choose “All stages”.</div>`}
@@ -437,7 +438,7 @@
       const unsub = l.unsubscribed || {};
       page.innerHTML = `
         <div class="c-card" style="display:grid;gap:12px">
-          <div class="c-row" style="align-items:flex-start"><div style="min-width:0"><h2 style="font-size:24px">${esc(l.first_name)} ${esc(l.last_name)} ${l.sample ? '<span class="c-tag info">SAMPLE</span>' : ""}${l.dnc ? '<span class="c-tag">DO NOT CONTACT</span>' : ""}${(l.tags || []).includes("Recycled") ? '<span class="c-tag info">RECYCLED</span>' : ""}${C.journeyTags(d.journey)}</h2>
+          <div class="c-row" style="align-items:flex-start"><div style="min-width:0"><h2 style="font-size:24px">${esc(l.first_name)} ${esc(l.last_name)} ${l.sample ? '<span class="c-tag info">SAMPLE</span>' : ""}${l.dnc ? '<span class="c-tag">DO NOT CONTACT</span>' : ""}${(l.tags || []).includes("Recycled") ? '<span class="c-tag info">RECYCLED</span>' : ""}${C.journeyTags(d.journey)} ${d.lifecycle && C.lifecyclePill ? C.lifecyclePill(d.lifecycle) : ""}</h2>
             <p class="muted mono" style="margin-top:4px">${esc(l.reference)} · received ${fDT(l.created_at)} · ${esc(l.form)} form · ${esc(C.stage(l.stage).label)} for ${esc(d.stage_days)} d</p></div><span class="sp"></span>
             <div style="text-align:right">${tempTag(l.temperature, l.score)}<div class="muted" style="font-size:12px;margin-top:4px">Owner: <b style="color:var(--fg)">${esc(d.owner ? d.owner.name : "Unassigned")}</b></div></div></div>
           <div class="c-stepper" role="group" aria-label="Stage">${flow.map((s, i) => `<button data-stage="${s.id}" class="${s.id === l.stage ? "cur" : curIdx > i || l.stage === "funded" ? "done" : ""}" style="--c:var(--s-${s.id})" ${work ? "" : "disabled"}>${esc(s.label)}</button>`).join("")}<button data-stage="lost" class="${l.stage === "lost" ? "cur" : ""}" style="--c:var(--s-lost);margin-left:8px;border-radius:999px" ${work ? "" : "disabled"}>Lost</button><button data-stage="invalid" class="${l.stage === "invalid" ? "cur" : ""}" style="--c:var(--s-invalid);border-radius:999px" ${work ? "" : "disabled"}>Invalid</button></div>

@@ -36,9 +36,10 @@
   const kpi = (label, val, sub, cls = "", go = "") => `<${go ? "button" : "div"} class="c-kpi ${cls}" ${go ? `data-go="${esc(go)}"` : ""}><span>${esc(label)}</span><b>${val}</b><small>${sub || ""}</small></${go ? "button" : "div"}>`;
   function wireGo(page) { $$("[data-go]", page).forEach(b => b.addEventListener("click", () => { const [path, qs] = b.dataset.go.split("?"); C.go(path, Object.fromEntries(new URLSearchParams(qs || ""))); })); }
 
+  Object.assign(C, { rangeBar, wireRange, reportFilters: filters });
   /* -------------------------------------------------------- dashboard */
   C.views.dashboard = {
-    title: "Dashboard",
+    title: "Sales dashboard",
     async render(page, r, alive) {
       const p = r.params, d = await API.call("report", "dashboard", filters(p)); if (!alive()) return;
       const k = d.kpis, mgr = isMgr();

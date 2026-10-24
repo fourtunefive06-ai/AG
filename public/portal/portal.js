@@ -9,11 +9,15 @@
   const fDT = iso => iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
   const root = $("#root");
   const S = { me: null };
+  let C_install = () => {};
 
   /* ------------------------------------------------------------- API */
   async function post(path, body) {
-    const r = window.PORTAL_API ? await window.PORTAL_API.post(path, body || {}) // in-browser demo
-      : await fetch("/api/portal/" + path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Requested-With": "absel-portal" }, body: JSON.stringify(body || {}) });
+    let r;
+    try {
+      r = window.PORTAL_API ? await window.PORTAL_API.post(path, body || {}) // in-browser demo
+        : await fetch("/api/portal/" + path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-Requested-With": "absel-portal" }, body: JSON.stringify(body || {}) });
+    } catch (e) { const ne = new Error(navigator.onLine === false ? "You're offline. Check your connection and try again." : "We couldn't reach Absel Global. Try again in a moment."); ne.network = true; throw ne; }
     let d = {}; try { d = await r.json(); } catch (e) {}
     if (r.status === 401 && path === "rpc") { S.me = null; go("login"); }
     if (!r.ok || d.ok === false) { const e = new Error(d.error || (d.need_code ? "Enter the 6-digit code from your authenticator app." : "Something went wrong. Please try again.")); e.fields = d.fields; e.data = d; throw e; }
@@ -84,6 +88,22 @@
   const kycPill = s => { const [l, c] = KYC[s] || KYC.none; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
   const TYPE = { deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer" };
 
+  /* ------------------------------------------------------------- attribution */
+  // First touch wins for 30 days: campaign links, the website's stored campaign, or a referral code
+  const ATTR_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "gclid", "fbclid", "ref", "landing"];
+  const ls = { get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+  const ss = k => { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } };
+  function captureAttribution() {
+    const found = {}, add = q => ATTR_KEYS.forEach(k => { const v = q.get(k); if (v && !found[k]) found[k] = v.slice(0, 300); });
+    try { add(new URLSearchParams(location.search)); add(new URLSearchParams((location.hash.split("?")[1]) || "")); } catch (e) {}
+    const site = ss("ag_utm"); if (site) ATTR_KEYS.forEach(k => { if (site[k] && !found[k]) found[k] = String(site[k]).slice(0, 300); });
+    if (!found.landing && document.referrer && !document.referrer.startsWith(location.origin)) found.landing = document.referrer.slice(0, 300);
+    const old = ls.get("ag_attr");
+    if (Object.keys(found).some(k => k !== "landing") && !(old && old.t > Date.now() - 30 * 864e5)) ls.set("ag_attr", Object.assign(found, { t: Date.now() }));
+  }
+  const attribution = () => { const a = ls.get("ag_attr") || {}, o = {}; ATTR_KEYS.forEach(k => { if (a[k]) o[k] = a[k]; }); return o; };
+  captureAttribution();
+
   /* ------------------------------------------------------------- routing */
   function parse() { const h = location.hash.replace(/^#\/?/, ""); const [path, qs] = h.split("?"); return { path: path || "", q: Object.fromEntries(new URLSearchParams(qs || "")) }; }
   function go(path) { if (location.hash !== "#" + path) location.hash = path; else render(); }
@@ -94,7 +114,13 @@
     const r = parse();
     if (r.path === "verify") return verifyPage(r.q.t);
     if (r.path === "reset") return resetPage(r.q.t);
-    if (!PUBLIC.includes(r.path)) { try { S.me = await rpc("me"); } catch (e) { S.me = null; } } // fresh on every page: the team may have acted since
+    if (!PUBLIC.includes(r.path)) {
+      try { S.me = await rpc("me"); } // fresh on every page: the team may have acted since
+      catch (e) {
+        if (e.network) { root.innerHTML = `<div class="auth-logo" style="display:block"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="95" height="40"></div><div class="empty" style="padding:60px 20px"><b>You're offline</b>Your account details load when you're back online.<p style="margin-top:16px"><button class="btn pri" id="retry">Try again</button></p></div>`; $("#retry").addEventListener("click", render); return; }
+        S.me = null;
+      }
+    }
     if (!S.me) return PUBLIC.includes(r.path) ? authPage(r.path) : go("login");
     if (PUBLIC.includes(r.path) || !r.path) return go("home");
     shell(r);
@@ -117,7 +143,6 @@
   }
   function authPage(p) {
     if (p === "register") {
-      const q = parse().q;
       authLayout(`<div><h2>Open your account</h2><p class="sub">Already registered? <a href="#login">Sign in</a></p></div>
         <form id="f" class="grid2" novalidate>
           ${fld("First name", inp("first_name", "", 'autocomplete="given-name"'))}${fld("Last name", inp("last_name", "", 'autocomplete="family-name"'))}
@@ -130,9 +155,12 @@
           <p class="form-err full" hidden></p>
           <button class="btn pri block full" type="submit">Create account</button>
         </form>`);
+      const pre = ss("ag_prefill") || {};
+      ["first_name", "last_name", "email", "phone"].forEach(k => { if (pre[k] && $(`[name=${k}]`)) $(`[name=${k}]`).value = pre[k]; });
+      if (pre.country && COUNTRIES.some(c => c[0] === pre.country)) $("#rC").value = pre.country; if (pre.dial_code) $("#rD").value = pre.dial_code;
       const f = $("#f"); $("#rC").addEventListener("change", e => { const c = COUNTRIES.find(x => x[0] === e.target.value); if (c && (!$("#rD").value || $("#rD").value === "+")) $("#rD").value = c[1]; else if (c) $("#rD").value = c[1]; });
       onSubmit(f, async v => {
-        const d = await post("register", Object.assign(v, { utm_source: q.utm_source || "", utm_campaign: q.utm_campaign || "", ref: q.ref || "" }));
+        const d = await post("register", Object.assign(v, attribution()));
         S.me = null; toast("Account created. Check your email to confirm it"); go("home"); devLink(d.dev_link, "confirmation");
       });
       return;
@@ -174,6 +202,7 @@
     root.innerHTML = `<div class="app">
       <nav class="side" aria-label="Client area"><a class="logo" href="#home"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="109" height="46"></a>
         ${NAV.map(([k, l, ic]) => `<a class="nv ${cur === k ? "on" : ""}" href="#${k}">${IC[ic]}<span>${l}</span></a>`).join("")}
+        ${standalone() ? "" : `<a class="nv" href="#install" id="instSide" role="button">${I('<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 8v7M9 12l3 3 3-3"/>')}<span>Install the app</span></a>`}
         <div class="me"><b>${esc(c.first_name)} ${esc(c.last_name)}</b>${esc(c.email)}<br><button id="out">Sign out</button></div></nav>
       <div class="main"><header class="top"><img class="tlogo" src="/assets/absel-global-logo-white.png" alt="Absel Global" width="85" height="36"><h1 id="ttl"></h1><span class="sp"></span><a class="btn sm pri" href="#deposit">${IC.dep.replace("<svg", '<svg width="16" height="16"')} Deposit</a></header>
         <div class="page" id="pg"><div class="loading">Loading…</div></div>
@@ -182,6 +211,9 @@
     $("#out").addEventListener("click", async () => { await post("logout").catch(() => {}); S.me = null; go("login"); });
     const v = VIEWS[cur] || VIEWS.home; $("#ttl").textContent = v.title; document.title = v.title + " · Absel Global";
     Promise.resolve(v.render($("#pg"), r)).catch(e => { $("#pg").innerHTML = `<div class="note warn">${esc(e.message)}</div>`; });
+    $$(".tabbar a, .side a.nv").forEach(a => { if (a.classList.contains("on")) a.setAttribute("aria-current", "page"); });
+    const ib = $("#instSide"); if (ib) ib.addEventListener("click", e => { e.preventDefault(); C_install(true); });
+    scheduleInstall();
   }
   const reload = async () => { S.me = await rpc("me"); render(); };
   const liveAccs = () => S.me.accounts.filter(a => a.kind === "live" && a.status === "open");
@@ -361,9 +393,11 @@
         <div style="display:grid;gap:20px">
           <section class="card"><h3>Email ${c.email_verified_at ? '<span class="pill" style="--c:var(--up)">Confirmed</span>' : '<span class="pill" style="--c:var(--warn)">Not confirmed</span>'}</h3>${c.email_verified_at ? `<p class="muted" style="font-size:14px">${esc(c.email)}</p>` : `<p class="muted" style="font-size:14px">We sent a link to ${esc(c.email)}.</p><button class="btn sm" id="resend" style="margin-top:10px">Send it again</button>`}</section>
           <form id="pw" class="card" style="display:grid;gap:12px" novalidate><h3>Change password</h3>${fld("Current password", inp("current", "", 'type="password" autocomplete="current-password"'))}${fld("New password", inp("password", "", 'type="password" autocomplete="new-password"'))}<p class="form-err" hidden></p><button class="btn" type="submit">Change password</button></form>
+          ${standalone() ? "" : `<section class="card"><h3>Absel Global app</h3><p class="muted" style="font-size:14px">Install the client area on your phone or computer. It opens like an app, straight to your account.</p><button class="btn sm pri" id="appBtn" style="margin-top:10px">Install the app</button></section>`}
           <section class="card" id="tf"><h3>Two-step login ${c.totp_enabled ? '<span class="pill" style="--c:var(--up)">On</span>' : '<span class="pill">Off</span>'}</h3><p class="muted" style="font-size:14px">${c.totp_enabled ? "You'll be asked for a code from your authenticator app when you sign in." : "Protect your money: ask for a code from Google Authenticator or a similar app when you sign in."}</p><button class="btn sm" id="tfBtn" style="margin-top:10px">${c.totp_enabled ? "Turn off" : "Turn on"}</button></section>
         </div></div>`;
       onSubmit($("#pf"), async v => { await rpc("updateProfile", v); toast("Saved"); await reload(); });
+      const ab = $("#appBtn"); if (ab) ab.addEventListener("click", () => C_install(true));
       onSubmit($("#pw"), async v => { await post("password", v); toast("Password changed"); $("#pw").reset(); });
       const rs = $("#resend"); if (rs) rs.addEventListener("click", async () => { try { const d = await post("resend"); toast("Sent. Check your inbox"); devLink(d.dev_link, "confirmation"); } catch (e) { toast(e.message); } });
       $("#tfBtn").addEventListener("click", async () => {
@@ -393,6 +427,46 @@
         </section></div>`;
     },
   };
+
+  /* ------------------------------------------------------------- app install (PWA) */
+  const standalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const iosSafari = isIOS && !/crios|fxios|edgios/i.test(navigator.userAgent);
+  let deferredPrompt = null, promptTimer = null;
+  const canInstall = () => !standalone() && (deferredPrompt || iosSafari || window.PORTAL_DEMO);
+  const snoozed = () => { const t = ls.get("ag_install_snooze"); return t && t > Date.now(); };
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); deferredPrompt = e; scheduleInstall(); });
+  window.addEventListener("appinstalled", () => { deferredPrompt = null; closeInstall(); toast("Absel Global is installed. Open it from your home screen"); });
+  function scheduleInstall() {
+    // Ask only signed-in clients, once per visit, after they've been here a little while, never on forms
+    clearTimeout(promptTimer);
+    if (!S.me || !canInstall() || snoozed()) return;
+    try { if (sessionStorage.getItem("ag_install_shown")) return; } catch (e) {}
+    promptTimer = setTimeout(() => { const pth = parse().path; if (S.me && ["home", "accounts", "history"].includes(pth) && !document.querySelector(".modal")) showInstall(); }, 12000);
+  }
+  function closeInstall(snoozeDays) { const el = $("#inst"); if (el) el.remove(); if (snoozeDays) ls.set("ag_install_snooze", Date.now() + snoozeDays * 864e5); }
+  async function doInstall() {
+    if (deferredPrompt) { deferredPrompt.prompt(); const ch = await deferredPrompt.userChoice.catch(() => ({})); deferredPrompt = null; closeInstall(ch.outcome === "accepted" ? 0 : 30); return; }
+    if (window.PORTAL_DEMO) { closeInstall(); toast("On abselglobal.com this installs the app on the device"); return; }
+    closeInstall();
+  }
+  function showInstall(fromMenu) {
+    if (!canInstall()) { if (fromMenu) toast(standalone() ? "You're already using the app" : "Open this page in Chrome, Edge or Safari to install the app"); return; }
+    try { sessionStorage.setItem("ag_install_shown", "1"); } catch (e) {}
+    closeInstall();
+    const ios = !deferredPrompt && iosSafari;
+    const el = document.createElement("div"); el.id = "inst"; el.className = "inst"; el.setAttribute("role", "dialog"); el.setAttribute("aria-labelledby", "instT");
+    el.innerHTML = `<img src="/assets/app-192.png" alt="" width="52" height="52"><div class="it"><b id="instT">Get the Absel Global app</b><p>${ios ? 'Tap <span class="ios-share" aria-label="Share">' + I('<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>').replace("<svg", '<svg width="18" height="18"') + '</span> then <b>Add to Home Screen</b>.' : "Check your balance, deposit and withdraw in one tap. No app store needed, it takes 2 seconds."}</p>
+      <div class="row">${ios ? "" : '<button class="btn sm pri" id="instGo">Install</button>'}<button class="btn sm ghost" id="instNo">${ios ? "Got it" : "Not now"}</button></div></div><button class="ix" id="instX" aria-label="Close">×</button>`;
+    document.body.appendChild(el);
+    const go2 = $("#instGo"); if (go2) go2.addEventListener("click", doInstall);
+    $("#instNo").addEventListener("click", () => closeInstall(ios ? 30 : 14)); $("#instX").addEventListener("click", () => closeInstall(14));
+  }
+  C_install = showInstall;
+  // Service worker: app shell works offline and loads instantly; money and account data always come live from the server
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !window.PORTAL_API) window.addEventListener("load", () => navigator.serviceWorker.register("/portal/sw.js", { scope: "/portal/" }).catch(() => {}));
+  function netBanner() { let b = $("#offline"); if (navigator.onLine !== false) { if (b) b.remove(); return; } if (!b) { b = document.createElement("div"); b.id = "offline"; b.className = "offline"; b.setAttribute("role", "status"); b.textContent = "You're offline. Balances and requests will update when you reconnect."; document.body.appendChild(b); } }
+  window.addEventListener("online", () => { netBanner(); if (S.me) render(); }); window.addEventListener("offline", netBanner); netBanner();
 
   window.addEventListener("message", e => { if (e.data === "portal:refresh" && S.me && ["home", "accounts", "history", "documents", ""].includes(parse().path.split("?")[0]) && !document.querySelector(".modal")) render(); });
   render();

@@ -1,10 +1,11 @@
-# Absel Global — website + Absel CRM
+# Absel Global — website, client app and brokerage back office
 
 Website, client area and CRM for **Absel Global**, a trading name of Absel Markets (FSC Mauritius, licence GB25205423). Clients only ever see the Absel Global brand; accounts and money are handled at Absel Markets by your operations team.
 
 * **Website** (`public/index.html`): landing page with hero form and popup form. "Log in" and "Open account" go to the client area. There is **no link to the CRM** anywhere on it.
 * **Client area** (`public/portal/`, at `/portal/`): clients register, confirm their email, upload KYC documents, request live and demo MT5 accounts, deposit, withdraw, transfer between accounts and see their history. Two-step login, password reset, account lockout.
-* **CRM** (`public/crm/`): served at a secret path you choose (`CRM_PATH`), e.g. `https://abselglobal.com/team-desk/`. It is not indexed by search engines.
+* **Client app:** the client area is a Progressive Web App. Clients can install it on Android, iPhone (Safari → Share → Add to Home Screen), Windows and Mac; it opens full-screen, starts on their dashboard, loads instantly and shows an offline screen without a connection. Account and money data are never cached on the device. Installing needs the site on HTTPS (as in the go-live steps).
+* **Back office** (`public/crm/`, formerly "the CRM"): served at a secret path you choose (`CRM_PATH`), e.g. `https://abselglobal.com/team-desk/`. It is not indexed by search engines.
 * **Backend** (`server.js` + `lib/`): no npm packages. It uses only Node.js built-ins, including Node's own SQLite.
 
 ---
@@ -27,6 +28,20 @@ Rules: KYC before a live account (switchable), KYC before any withdrawal, minimu
 **Roles:** *Operations* (all queues, clients, balances), *Compliance* (KYC review only). Sales agents see their own clients' client-area status on the lead page; managers see all.
 
 **What clients see of Absel Markets:** only the legal line ("Absel Global is a trading name of Absel Markets…") in the footer and legal documents. Bank transfer details must name the licensed company's segregated account, and card statements and the MT5 server show whatever names Absel Markets' providers use; ask them for "Absel Global" names where possible. Have compliance approve the legal line, client agreement and privacy policy before go-live.
+
+## The back office, organised around the brokerage lifecycle
+
+Menus follow the client's path: **Overview** (Business overview, Sales dashboard, Operations desk) → **Acquisition** (marketing, campaigns, broadcasts, lead sources) → **Sales** (My day, calling, inbox, leads, Client journey, follow-ups, deposit pipeline, demo & $100, targets) → **Sales management** → **Clients & onboarding** (clients, KYC review, account opening) → **Funding** (deposits & withdrawals, FTD verification) → **Trading** (trading accounts, trading data import) → **Communication** → **Reports** → **Admin**. Every earlier screen and link still works.
+
+**Business overview** (home for admins and sales managers): leads, client-area sign-ups, accounts opened, FTDs, deposits, withdrawals, net deposits, active traders and client balances for any period; the customer journey from lead to repeat deposit; what needs attention now (people stuck at each step, operations queues); daily leads/sign-ups and money in/out; the client book by lifecycle stage; results by source and agent.
+
+**Client lifecycle.** Every person is one lead record from first contact onwards; the client-area account, MT5 accounts, deposits and withdrawals link to it. Stages: new lead → lead in progress → registered (onboarding incomplete) → KYC under review / needs attention → verified → account open → funded, not trading → active trader → dormant. The **Client journey** screen lists who is stuck at each step (not reached, registration incomplete, KYC pending, KYC needs attention, verified but not funded, funded but not trading, dormant, active) with owner, days waiting and next follow-up; managers can reassign in bulk. Agents see their own clients there and on My day.
+
+**Lead capture.** Every client-area sign-up becomes a lead: matched to the existing lead by email, then phone (never a second copy), a lost lead is reopened, an owner is assigned by territory, and the welcome-call task is created. Campaign, referral and landing page are captured from the link, the website (which passes its stored campaign to sign-up links) and a 30-day first-touch record kept in the browser; if someone fills the website form first, the sign-up form is pre-filled and links to that lead. Merging duplicates keeps the client-area account, MT5 accounts and money with the kept lead.
+
+**Lifecycle automations** (all editable in Automations): sign-up → welcome call; registration incomplete after 24 h → email + WhatsApp + call task; KYC rejected → help call; KYC approved → account and first-deposit call; funded but not trading after 3 days → first-trade email + walkthrough call; dormant (30 days without a deposit or trade, set in Settings) → re-engagement email + call.
+
+**Trading activity** without an MT5 connection: the daily trading data import (Login, Balance, optional Equity, Lots, Last trade) updates balances, marks clients as active traders when lots rise, a last-trade date is given or equity differs from balance (open positions), and also matches accounts opened by sales before the client area via the lead's trading account number. Operations can also mark trading started by hand.
 
 ## What the CRM does
 
@@ -140,7 +155,7 @@ Open `http://localhost:3000/team-desk/`.
    ```nginx
    server {
      server_name abselglobal.com www.abselglobal.com;
-     client_max_body_size 10m;   # portal KYC/receipt uploads are up to ~6.5 MB once encoded
+     client_max_body_size 5m;
      location / {
        proxy_pass http://127.0.0.1:3000;
        proxy_set_header Host $host;
@@ -260,11 +275,12 @@ lib/store-sqlite.js    SQLite persistence
 lib/channels.js        email (SMTP, SendGrid, Brevo, Resend) and WhatsApp Cloud API
 db/schema.sql          reporting views
 public/index.html      website
-public/portal/         client area (index.html, portal.js)
+public/portal/         client app (index.html, portal.js, manifest.webmanifest, sw.js service worker)
 public/crm/            CRM app: app.js (shell, roles), views-work.js (queue, calling, leads, lead page), views-sales.js (inbox, pipeline,
                        deposits, targets, team live, call quality, hygiene), views-marketing.js (overview, campaigns, broadcasts,
                        lead sources, opt-outs), views-insights.js (dashboard, reports), views-admin.js (automations, templates, team, settings),
-                       views-journey.js (demo and $100 account), views-ops.js (operations: KYC, accounts, client money, clients, balances)
+                       views-journey.js (demo and $100 account), views-ops.js (operations: KYC, accounts, client money, clients, balances),
+                       views-overview.js (business overview, client journey, trading accounts)
 tools/simulate.js      30-day call-centre simulation: self-test incl. security checks (`npm test`) and demo data (`npm run demo`)
 tools/import-backup.js load a CRM backup into the server database
 ```

@@ -8,6 +8,12 @@
 <meta name="theme-color" content="#162040">
 <link rel="icon" type="image/png" sizes="64x64" href="/assets/favicon-64.png">
 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Absel Global">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Your Absel Global client area: trading accounts, deposits, withdrawals and documents.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
@@ -176,6 +182,22 @@ table.t td small{display:block;color:var(--muted);font-size:12.5px}
 .mgr .av{width:44px;height:44px;border-radius:50%;background:var(--cta-soft);color:var(--cta);display:grid;place-items:center;font-weight:800}
 .qr{background:#fff;padding:10px;border-radius:10px;justify-self:start}
 .loading{padding:60px;text-align:center;color:var(--muted)}
+/* app install prompt: a quiet card, never a blocking modal */
+.inst{position:fixed;z-index:80;right:20px;bottom:calc(20px + env(safe-area-inset-bottom));width:min(380px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px -24px rgba(6,10,26,.45);padding:16px 40px 16px 16px;display:flex;gap:14px;align-items:flex-start;animation:rise .25s ease}
+.inst img{border-radius:12px;border:1px solid var(--line);flex:none}
+.inst b{font-size:15.5px}.inst p{color:var(--muted);font-size:13.5px;margin:4px 0 10px}
+.inst .ix{position:absolute;top:8px;right:8px;width:30px;height:30px;border:0;background:none;color:var(--muted);font-size:20px;cursor:pointer;border-radius:8px}
+.ios-share{display:inline-flex;vertical-align:-4px;color:var(--cta)}
+.offline{position:fixed;left:0;right:0;top:0;z-index:95;background:var(--warn);color:#fff;text-align:center;font-size:13.5px;font-weight:600;padding:calc(6px + env(safe-area-inset-top)) 12px 6px}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}
+@media (max-width:900px){.inst{left:16px;right:16px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom))}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* app feel on phones: safe areas, no tap flash, roomy targets */
+.top{padding-top:calc(12px + env(safe-area-inset-top))}
+.auth-logo{padding-top:calc(16px + env(safe-area-inset-top))!important}
+a,button,label.choice{-webkit-tap-highlight-color:transparent}
+@media (max-width:900px){.btn.sm{padding:10px 14px}.in{font-size:16px}}
+@media (display-mode: standalone){body{overscroll-behavior-y:none}}
 </style>
 </head>
 <body>

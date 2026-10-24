@@ -1,0 +1,25 @@
+{
+  "id": "/portal/",
+  "name": "Absel Global",
+  "short_name": "Absel Global",
+  "description": "Your Absel Global client area: trading accounts, deposits, withdrawals and documents.",
+  "lang": "en",
+  "start_url": "/portal/#home",
+  "scope": "/portal/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#162040",
+  "theme_color": "#162040",
+  "categories": ["finance", "business"],
+  "icons": [
+    { "src": "/assets/app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/app-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/app-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Deposit", "url": "/portal/#deposit", "icons": [{ "src": "/assets/app-192.png", "sizes": "192x192" }] },
+    { "name": "Withdraw", "url": "/portal/#withdraw", "icons": [{ "src": "/assets/app-192.png", "sizes": "192x192" }] },
+    { "name": "Transactions", "url": "/portal/#history", "icons": [{ "src": "/assets/app-192.png", "sizes": "192x192" }] }
+  ]
+}
