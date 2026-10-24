@@ -140,7 +140,7 @@ Open `http://localhost:3000/team-desk/`.
    ```nginx
    server {
      server_name abselglobal.com www.abselglobal.com;
-     client_max_body_size 5m;
+     client_max_body_size 10m;   # portal KYC/receipt uploads are up to ~6.5 MB once encoded
      location / {
        proxy_pass http://127.0.0.1:3000;
        proxy_set_header Host $host;
