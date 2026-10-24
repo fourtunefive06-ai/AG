@@ -2,6 +2,7 @@
  * Simulates a 30-day call-centre month against the CRM core.
  *   node tools/simulate.js            → runs checks + prints report summaries
  *   node tools/simulate.js --dump DIR → also writes every collection as JSON (used for demo data)
+ *   node tools/simulate.js --demo     → loads the month into DATABASE_URL (must be an empty Postgres database)
  */
 "use strict";
 const path = require("path"), fs = require("fs"), assert = require("assert");
@@ -461,21 +462,26 @@ function shiftDates(obj, delta) {
 }
 const COLS = require("../lib/core.js").COLLECTIONS;
 const arg = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
-if (arg("--dump") || arg("--db")) {
+// --demo loads into DATABASE_URL from .env; --db <postgres url> loads into another database
+if (process.argv.includes("--demo")) { try { process.loadEnvFile(path.join(__dirname, "..", ".env")); } catch {} }
+const demoDb = arg("--db") || (process.argv.includes("--demo") && process.env.DATABASE_URL) || null;
+if (process.argv.includes("--demo") && !demoDb) { console.error("✖ Set DATABASE_URL in .env (a separate, empty Postgres database for the demo)."); process.exit(1); }
+if (arg("--dump") || demoDb) {
   leads.forEach(l => delete l.quality);
   const delta = process.argv.includes("--shift-to-now") ? Date.now() - T : 0;
   const data = Object.fromEntries(COLS.map(c => [c, shiftDates(JSON.parse(JSON.stringify(store.all(c))), delta)]));
   data.users.forEach(u => { delete u.password_hash; u.sample = true; });
   if (arg("--dump")) { const dir = arg("--dump"); fs.mkdirSync(dir, { recursive: true }); for (const c of COLS) fs.writeFileSync(path.join(dir, c + ".json"), JSON.stringify(data[c])); console.log("dumped to", dir); }
-  if (arg("--db")) {
+  if (demoDb) (async () => {
     // Demo database for trying the CRM: every sample user signs in with the password below.
-    const { openStore } = require("../lib/store-sqlite.js");
+    const { openStore } = require("../lib/store-postgres.js");
     const crypto = require("crypto");
     const hash = p => { const salt = crypto.randomBytes(16); return `pbkdf2$sha256$310000$${salt.toString("base64")}$${crypto.pbkdf2Sync(p, salt, 310000, 32, "sha256").toString("base64")}`; };
     const pw = arg("--password") || "demo-pass-123", h = hash(pw);
-    const db = openStore(path.resolve(arg("--db")), path.join(__dirname, "..", "db", "schema.sql"));
-    if (db.all("leads").length) { console.error("✖ That database already has leads. Use a new file."); process.exit(1); }
+    const db = await openStore(demoDb, path.join(__dirname, "..", "db", "schema.sql")).open();
+    if (db.all("leads").length) { console.error("✖ That database already has leads. Use a new, empty database."); process.exit(1); }
     db.transaction(() => { for (const c of COLS) for (const o of data[c]) { if (c === "users") { o.password_hash = h; o.must_change_password = false; } db.put(c, o); } });
-    console.log(`✔ Demo database written to ${arg("--db")}. Sign in as admin, sara (sales manager), daniel / grace / chinedu / rahul / yousef / mai (agents), nadia (marketing manager), omar (marketing), fatima / ali (operations) or joy (compliance) with password: ${pw}`);
-  }
+    await db.close();
+    console.log(`✔ Demo data written to ${new URL(demoDb).host}. Sign in as admin, sara (sales manager), daniel / grace / chinedu / rahul / yousef / mai (agents), nadia (marketing manager), omar (marketing), fatima / ali (operations) or joy (compliance) with password: ${pw}`);
+  })().catch(e => { console.error("✖ " + e.message); process.exit(1); });
 }

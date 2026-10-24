@@ -8,8 +8,13 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node tools/simulate.js",
-    "demo": "node tools/simulate.js --db db/demo.db --shift-to-now"
+    "demo": "node tools/simulate.js --demo --shift-to-now",
+    "import": "node tools/import-backup.js"
   },
-  "engines": { "node": ">=22.13" },
-  "dependencies": {}
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
 }

@@ -1,9 +1,9 @@
 /**
  * Absel Global — website + lead API + Absel CRM
- * Zero dependencies: Node.js 22.13+ (built-in http, crypto and node:sqlite).
+ * Node.js 22.13+ (built-in http and crypto) and PostgreSQL via the `pg` package.
  *
- *   cp .env.example .env    (edit it)
- *   node server.js
+ *   cp .env.example .env    (edit it: DATABASE_URL, SESSION_SECRET, admin login)
+ *   npm install && node server.js
  */
 "use strict";
 const http = require("http");
@@ -15,12 +15,12 @@ const ROOT = __dirname;
 try { process.loadEnvFile(path.join(ROOT, ".env")); } catch { /* optional */ }
 
 const { createCRM, CrmError } = require("./lib/core.js");
-const { openStore } = require("./lib/store-sqlite.js");
+const { openStore } = require("./lib/store-postgres.js");
 const channels = require("./lib/channels.js");
 
 /* ------------------------------------------------------------------ config */
 const PORT = Number(process.env.PORT || 3000);
-const DB_FILE = path.resolve(ROOT, process.env.DB_FILE || "db/crm.db");
+const DATABASE_URL = (process.env.DATABASE_URL || "").trim();
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const SESSION_HOURS = Number(process.env.SESSION_HOURS || 12);
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -29,6 +29,7 @@ const CRM_PATH = "/" + (process.env.CRM_PATH || "crm").replace(/^\/+|\/+$/g, "")
 const RESTRICTED = new Set(["United Arab Emirates", "United States", "Canada", "Singapore", "Cuba", "Eritrea", "Myanmar", "Iran", "North Korea", "Kyrgyzstan", "Syria", "Liberia", "Yemen", "Somalia", "Jamaica", "Albania", "Barbados", "Cambodia", "Panama"]);
 
 if (SESSION_SECRET.length < 32) { console.error("✖ Set SESSION_SECRET in .env (at least 32 random characters)."); process.exit(1); }
+if (!DATABASE_URL) { console.error("✖ Set DATABASE_URL in .env to your Postgres connection string (e.g. from Neon: postgresql://user:pass@host/db?sslmode=require)."); process.exit(1); }
 
 /* --------------------------------------------------------------- passwords */
 // PBKDF2-SHA256, 310,000 rounds (OWASP). Same format the browser prototype writes, so accounts move between them.
@@ -51,25 +52,27 @@ function verifyPassword(p, stored) {
 const DUMMY_HASH = hashPassword(crypto.randomBytes(12).toString("hex")); // keeps "unknown user" as slow as "wrong password"
 
 /* ------------------------------------------------------------- CRM + queue */
-const store = openStore(DB_FILE, path.join(ROOT, "db", "schema.sql"));
+const store = openStore(DATABASE_URL, path.join(ROOT, "db", "schema.sql")); // loaded in start() below
 const sendQueue = [];
 // One-click unsubscribe links in marketing emails: /unsubscribe?t=<lead id>.<signature>
 const unsubToken = id => Buffer.from(id).toString("base64url") + "." + crypto.createHmac("sha256", SESSION_SECRET).update("unsub:" + id).digest("base64url").slice(0, 22);
 const crm = createCRM({ store, hashPassword, verifyPassword, random: n => new Uint8Array(crypto.randomBytes(n)), onQueue: m => sendQueue.push(m.id),
   hashToken: t => crypto.createHash("sha256").update(String(t)).digest("hex"),
   unsubscribeUrl: l => (crm.getSettings().site_url || "") + "/unsubscribe?t=" + unsubToken(l.id) });
-store.transaction(() => crm.ensureDefaults());
 
-// First start: create the admin from .env
-if (!store.all("users").some(u => u.role === "admin")) {
-  const u = (process.env.ADMIN_USERNAME || "").trim(), p = process.env.ADMIN_PASSWORD || "";
-  if (!u || p.length < 10) { console.error("✖ First start: set ADMIN_USERNAME and ADMIN_PASSWORD (10+ characters, letters and numbers) in .env to create the admin login."); process.exit(1); }
-  try { store.transaction(() => crm.saveUser(crm.SYSTEM, { name: process.env.ADMIN_NAME || "Administrator", username: u, password: p, role: "admin", email: process.env.ADMIN_EMAIL || "", accepts_leads: false, must_change_password: true })); }
-  catch (e) { console.error("✖ " + e.message); process.exit(1); }
-  console.log(`✔ Admin user "${u}" created. It must choose a new password at first sign-in. Remove ADMIN_PASSWORD from .env now.`);
+function prepare() {
+  store.transaction(() => crm.ensureDefaults());
+  // First start: create the admin from .env
+  if (!store.all("users").some(u => u.role === "admin")) {
+    const u = (process.env.ADMIN_USERNAME || "").trim(), p = process.env.ADMIN_PASSWORD || "";
+    if (!u || p.length < 10) { console.error("✖ First start: set ADMIN_USERNAME and ADMIN_PASSWORD (10+ characters, letters and numbers) in .env to create the admin login."); process.exit(1); }
+    try { store.transaction(() => crm.saveUser(crm.SYSTEM, { name: process.env.ADMIN_NAME || "Administrator", username: u, password: p, role: "admin", email: process.env.ADMIN_EMAIL || "", accepts_leads: false, must_change_password: true })); }
+    catch (e) { console.error("✖ " + e.message); process.exit(1); }
+    console.log(`✔ Admin user "${u}" created. It must choose a new password at first sign-in. Remove ADMIN_PASSWORD from .env now.`);
+  }
+  // Re-queue anything left unsent by a previous run
+  store.all("messages").filter(m => m.status === "queued").forEach(m => sendQueue.push(m.id));
 }
-// Re-queue anything left unsent by a previous run
-store.all("messages").filter(m => m.status === "queued").forEach(m => sendQueue.push(m.id));
 
 let sending = false;
 async function drainQueue() {
@@ -90,7 +93,10 @@ async function drainQueue() {
     }
   } finally { sending = false; }
 }
-setInterval(() => { try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); dailyMis().catch(e => console.error("MIS email:", e.message)); }, 30000).unref();
+function startJobs() {
+  setInterval(() => { try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); dailyMis().catch(e => console.error("MIS email:", e.message)); }, 30000).unref();
+  setTimeout(() => { try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); }, 3000).unref();
+}
 
 /* ------------------------------------------------------- daily MIS email */
 async function sendMis(day, to) {
@@ -108,7 +114,6 @@ async function dailyMis() {
   await sendMis(y, cfg.recipients);
   console.log("✔ Daily MIS email sent for", y);
 }
-setTimeout(() => { store.transaction(() => crm.tick()); drainQueue(); }, 3000).unref();
 
 /* ----------------------------------------------------------------- helpers */
 const clean = (v, max = 200) => (v == null ? "" : String(v)).replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
@@ -142,9 +147,14 @@ const cookie = (v, age) => `ag_crm=${encodeURIComponent(v)}; Path=/; HttpOnly; S
 
 const SEC = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Frame-Options": "SAMEORIGIN", ...(IS_PROD ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" } : {}) };
 function send(res, status, body, headers = {}) {
+  if (res.sending) return; res.sending = true;
   const str = typeof body === "string";
-  res.writeHead(status, { ...SEC, "Content-Type": str ? "text/plain; charset=utf-8" : "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
-  res.end(str ? body : JSON.stringify(body));
+  const write = () => {
+    res.writeHead(status, { ...SEC, "Content-Type": str ? "text/plain; charset=utf-8" : "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
+    res.end(str ? body : JSON.stringify(body));
+  };
+  // Answer only after this request's changes are saved in Postgres
+  return store.pending() ? store.flush().then(write) : write();
 }
 function readBody(req, limit = 4 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
@@ -560,16 +570,31 @@ const server = http.createServer(async (req, res) => {
   } catch (e) {
     if (e.status) return send(res, e.status, { ok: false, error: e.message });
     console.error(e);
-    if (!res.headersSent) send(res, 500, { ok: false, error: "Server error" });
+    if (!res.headersSent && !res.sending) send(res, 500, { ok: false, error: "Server error" });
   }
 });
 
-server.listen(PORT, () => {
-  const c = channels.status();
-  console.log(`✔ Absel Global running on http://localhost:${PORT}`);
-  console.log(`  CRM:        http://localhost:${PORT}${CRM_PATH}/`);
-  console.log(`  Client area: http://localhost:${PORT}/portal/`);
-  console.log(`  Database:   ${DB_FILE}`);
-  console.log(`  Email:      ${c.email.configured ? c.email.provider + " (" + c.email.from + ")" : "not configured — messages are logged as skipped"}`);
-  console.log(`  WhatsApp:   ${c.whatsapp.configured ? "Cloud API connected" : "not configured — messages are logged as skipped"}`);
+async function start() {
+  try { await store.open(); }
+  catch (e) { console.error("✖ Could not open the Postgres database (check DATABASE_URL): " + e.message); process.exit(1); }
+  prepare();
+  startJobs();
+  server.listen(PORT, () => {
+    const c = channels.status();
+    console.log(`✔ Absel Global running on http://localhost:${PORT}`);
+    console.log(`  CRM:        http://localhost:${PORT}${CRM_PATH}/`);
+    console.log(`  Client area: http://localhost:${PORT}/portal/`);
+    console.log(`  Database:   PostgreSQL ${new URL(DATABASE_URL).host} (${store.all("leads").length} leads, ${store.all("users").length} users)`);
+    console.log(`  Email:      ${c.email.configured ? c.email.provider + " (" + c.email.from + ")" : "not configured — messages are logged as skipped"}`);
+    console.log(`  WhatsApp:   ${c.whatsapp.configured ? "Cloud API connected" : "not configured — messages are logged as skipped"}`);
+  });
+}
+// Render and PM2 send SIGTERM on deploy/restart: finish saving before exiting
+let stopping = false;
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, async () => {
+  if (stopping) return; stopping = true;
+  server.close();
+  try { await store.close(); } catch (e) { console.error("postgres: " + e.message); }
+  process.exit(0);
 });
+start();
