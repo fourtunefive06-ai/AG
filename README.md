@@ -1,12 +1,32 @@
 # Absel Global — website + Absel CRM
 
-Client-acquisition website for **Absel Markets** (FSC Mauritius, licence GB25205423) and a call-centre CRM that turns website leads into funded accounts.
+Website, client area and CRM for **Absel Global**, a trading name of Absel Markets (FSC Mauritius, licence GB25205423). Clients only ever see the Absel Global brand; accounts and money are handled at Absel Markets by your operations team.
 
-* **Website** (`public/index.html`): landing page with hero form and popup form. There is **no link to the CRM** anywhere on it.
+* **Website** (`public/index.html`): landing page with hero form and popup form. "Log in" and "Open account" go to the client area. There is **no link to the CRM** anywhere on it.
+* **Client area** (`public/portal/`, at `/portal/`): clients register, confirm their email, upload KYC documents, request live and demo MT5 accounts, deposit, withdraw, transfer between accounts and see their history. Two-step login, password reset, account lockout.
 * **CRM** (`public/crm/`): served at a secret path you choose (`CRM_PATH`), e.g. `https://abselglobal.com/team-desk/`. It is not indexed by search engines.
 * **Backend** (`server.js` + `lib/`): no npm packages. It uses only Node.js built-ins, including Node's own SQLite.
 
 ---
+
+## How the client area works with Absel Markets
+
+The client area doesn't connect to MT5 or a payment provider. Every client request lands in a queue in the CRM; operations does the step at Absel Markets and records it, and the client sees the result at once (and gets an email).
+
+| Client does | Queue (CRM → Operations) | Operations does at Absel Markets, then records |
+|---|---|---|
+| Uploads ID and proof of address | **KYC review** (compliance) | Checks the documents; approve, ask for new ones, or reject. Approving moves the sales lead to "KYC verified" |
+| Requests a live or demo account | **Account opening** | Opens it in MT5 Manager; enters login, server, group and a first password, which the client sees **once** (never stored after that, never emailed) |
+| Sends a deposit (with receipt) | **Client money → Deposits** | Confirms the money arrived and credits MT5; enters the bank/PSP reference. The client's first deposit becomes a **verified FTD** for the sales agent automatically |
+| Requests a withdrawal | **Client money → Withdrawals** | Approves (two different people above the limit, default $1,000), pays, enters the payment reference |
+| Requests a transfer | **Client money → Transfers** | Moves the balance in MT5, marks it done |
+| Sees balances | **Balance import** | Uploads the daily CSV (Login, Balance, Equity) from Absel Markets; clients see dated balances and can't withdraw more than that |
+
+Rules: KYC before a live account (switchable), KYC before any withdrawal, minimum first deposit per account type, method minimums and maximums, withdrawals held against the balance while pending. Bank details, wallet addresses, payment links, account types, leverages and the legal line are set in **CRM → Client area settings**.
+
+**Roles:** *Operations* (all queues, clients, balances), *Compliance* (KYC review only). Sales agents see their own clients' client-area status on the lead page; managers see all.
+
+**What clients see of Absel Markets:** only the legal line ("Absel Global is a trading name of Absel Markets…") in the footer and legal documents. Bank transfer details must name the licensed company's segregated account, and card statements and the MT5 server show whatever names Absel Markets' providers use; ask them for "Absel Global" names where possible. Have compliance approve the legal line, client agreement and privacy policy before go-live.
 
 ## What the CRM does
 
@@ -93,7 +113,8 @@ npm start
 
 Open `http://localhost:3000/team-desk/`.
 
-* **Demo logins:** `admin` (admin), `sara` (sales manager), the agents `daniel`, `grace`, `chinedu`, `rahul`, `yousef`, `mai`, `nadia` (marketing manager) and `omar` (marketing executive).
+* **Demo logins:** `admin` (admin), `sara` (sales manager), the agents `daniel`, `grace`, `chinedu`, `rahul`, `yousef`, `mai`, `nadia` (marketing manager), `omar` (marketing executive), `fatima` and `ali` (operations) and `joy` (compliance).
+* **Client area:** `http://localhost:3000/portal/`. Register a test client; without email configured, the verification and reset links are printed in the server console (development only). Demo clients use the password `Client-pass-2026`.
 * **Demo password:** `demo-pass-123` for every account. Demo only, never use it on a live server.
 
 ## 2. Go live
@@ -239,9 +260,11 @@ lib/store-sqlite.js    SQLite persistence
 lib/channels.js        email (SMTP, SendGrid, Brevo, Resend) and WhatsApp Cloud API
 db/schema.sql          reporting views
 public/index.html      website
+public/portal/         client area (index.html, portal.js)
 public/crm/            CRM app: app.js (shell, roles), views-work.js (queue, calling, leads, lead page), views-sales.js (inbox, pipeline,
                        deposits, targets, team live, call quality, hygiene), views-marketing.js (overview, campaigns, broadcasts,
-                       lead sources, opt-outs), views-insights.js (dashboard, reports), views-admin.js (automations, templates, team, settings)
+                       lead sources, opt-outs), views-insights.js (dashboard, reports), views-admin.js (automations, templates, team, settings),
+                       views-journey.js (demo and $100 account), views-ops.js (operations: KYC, accounts, client money, clients, balances)
 tools/simulate.js      30-day call-centre simulation: self-test incl. security checks (`npm test`) and demo data (`npm run demo`)
 tools/import-backup.js load a CRM backup into the server database
 ```

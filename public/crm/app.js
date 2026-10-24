@@ -38,6 +38,8 @@
   const isSales = () => isMgr() || role() === "agent";                   // works leads
   const seesAll = () => isMgr() || isMkt();
   const canComm = () => isMgr() || isMktMgr();
+  const isOps = () => isAdmin() || role() === "operations";              // client-area operations (accounts, money)
+  const isKyc = () => isOps() || role() === "compliance";                  // document review
   const roleLabel = r => (C.state.meta && C.state.meta.role_labels && C.state.meta.role_labels[r]) || r;
   const salesUsers = () => C.state.meta.users.filter(u => u.sales);
   const stage = id => (C.state.meta.stages.find(s => s.id === id) || { id, label: id });
@@ -53,6 +55,7 @@
 
   const I = (p, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
   const ICONS = {
+    idcard: I('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.8 16a3.4 3.4 0 0 1 6.4 0M14 10h4M14 13h3"/>'), bank: I('<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>'),
     gift: I('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v9h14v-9M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>'), play: I('<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M10 8l5 3-5 3z"/><path d="M8 21h8"/>'),
     day: I('<path d="M3 12h4l3-8 4 16 3-8h4"/>'), phone: I('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>'),
     list: I('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'), check: I('<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
@@ -73,7 +76,7 @@
     plug: I('<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/>'), shield: I('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'),
     pie: I('<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>'), coffee: I('<path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2M7 3v2M11 3v2M15 3v2"/>'),
   };
-  const TL_ICON = { call: ICONS.phone, pbx: ICONS.phone, note: ICONS.note, message: ICONS.msg, stage: ICONS.flag, assign: ICONS.user, created: ICONS.user, task: ICONS.clock, automation: ICONS.bolt, edit: ICONS.note, deposit: ICONS.cash, checklist: ICONS.check, file: ICONS.upload, merge: ICONS.users, demo: ICONS.play, bonus: ICONS.gift };
+  const TL_ICON = { call: ICONS.phone, pbx: ICONS.phone, note: ICONS.note, message: ICONS.msg, stage: ICONS.flag, assign: ICONS.user, created: ICONS.user, task: ICONS.clock, automation: ICONS.bolt, edit: ICONS.note, deposit: ICONS.cash, checklist: ICONS.check, file: ICONS.upload, merge: ICONS.users, demo: ICONS.play, bonus: ICONS.gift, portal: ICONS.bank };
 
   /* --------------------------------------------------------------- toast */
   function toast(msg) { let t = $("#cToast"); if (!t) { t = document.createElement("div"); t.id = "cToast"; t.className = "c-toast"; t.setAttribute("role", "status"); $("#crm").appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 3000); }
@@ -183,17 +186,18 @@
     ["Sales management", [["live", "Team live", "live", isMgr], ["quality", "Call quality", "star", isSales, "reviews"], ["hygiene", "Lead hygiene", "broom", isMgr], ["territories", "Territories", "map", isMgr]]],
     ["Marketing", [["mkt", "Marketing overview", "pie", isMkt], ["campaigns", "Campaigns & spend", "megaphone", isMkt], ["broadcasts", "Broadcasts", "send", isMkt, "broadcasts"], ["sources", "Lead sources", "plug", isMkt], ["leads", "Leads (view only)", "list", () => isMkt() && !isSales()]]],
     ["Communication", [["templates", "Templates", "mail", () => canComm() || isMkt()], ["automations", "Automations", "bolt", () => canComm() || isMkt()], ["messages", "Message log", "msg", () => canComm() || isMkt()], ["optouts", "Opt-outs & DNC", "shield", () => isMgr() || isMkt()]]],
-    ["Insights", [["dashboard", "Dashboard", "grid", () => true], ["reports", "Reports & MIS", "chart", () => true]]],
+    ["Operations", [["ops", "Ops overview", "grid", isKyc], ["kyc", "KYC review", "idcard", isKyc, "kyc"], ["openacc", "Account opening", "bank", isOps, "accounts"], ["money", "Client money", "cash", isOps, "money"], ["clients", "Clients", "users", () => isKyc() || isSales()], ["balances", "Balance import", "upload", isOps], ["portalsettings", "Client area settings", "gear", isAdmin]]],
+    ["Insights", [["dashboard", "Dashboard", "grid", () => isSales() || isMkt()], ["reports", "Reports & MIS", "chart", () => isSales() || isMkt()]]],
     ["Admin", [["team", "Team", "users", () => isMgr() || isMktMgr()], ["import", "Import leads", "upload", () => isMgr() || isMktMgr()], ["settings", "Settings", "gear", isAdmin]]],
   ];
   const ACCESS = {}; NAV.forEach(([, items]) => items.forEach(i => { const prev = ACCESS[i[0]]; ACCESS[i[0]] = prev ? () => prev() || i[3]() : i[3]; }));
   ACCESS.lead = () => true;
-  const home = () => (isMgr() ? "dashboard" : isSales() ? "queue" : isMkt() ? "mkt" : "dashboard");
+  const home = () => (isMgr() ? "dashboard" : isSales() ? "queue" : isMkt() ? "mkt" : isOps() ? "ops" : isKyc() ? "kyc" : "dashboard");
   C.home = home;
   function shell() {
     const u = C.state.user, m = C.state.meta;
     const nav = NAV.map(([g, items]) => { const vis = items.filter(i => i[3]()); return vis.length ? `<h6>${g}</h6>` + vis.map(([k, l, ic, , badge]) => `<a href="${C.href(k)}" data-nav="${k}">${ICONS[ic]}<span>${l}</span>${badge ? `<b data-badge="${badge}" hidden></b>` : ""}</a>`).join("") : ""; }).join("");
-    const ws = isSales() && isMkt() ? "Sales + Marketing" : isMkt() ? "Marketing workspace" : "Sales workspace";
+    const ws = isAdmin() ? "Admin" : isSales() && isMkt() ? "Sales + Marketing" : isMkt() ? "Marketing workspace" : isOps() ? "Operations" : isKyc() ? "Compliance" : "Sales workspace";
     $("#crm").innerHTML = `<div class="c-shell"><aside class="c-side"><div class="c-logo"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="128" height="54"><small>CRM · ${esc(ws.toUpperCase())}</small></div><nav class="c-nav" aria-label="CRM">${nav}</nav><div class="c-me"><b>${esc(u.name)}</b><span>${esc(roleLabel(u.role))}</span>${u.sample ? '<span style="display:block;color:#8FA0C8;font-size:11.5px;margin-top:4px">Sample account</span>' : ""}</div></aside><div class="c-scrim" data-act="closenav"></div>
       <div class="c-main"><header class="c-top"><button class="c-btn ghost c-burger" data-act="opennav" aria-label="Menu">${ICONS.menu}</button><h1 id="cTitle"></h1><span class="sp"></span>
       <input class="c-in c-search" id="cSearch" type="search" placeholder="Search name, phone, email, ref" aria-label="Search leads">
@@ -225,7 +229,7 @@
   }
   function drawBadges() {
     const m = C.state.meta; if (!m) return;
-    const vals = { inbox: m.inbox_unread, deposits: m.deposits_pending, bonus: m.bonuses_pending, broadcasts: m.broadcasts_pending, reviews: m.reviews_new, queue: C.state.queueCount };
+    const vals = { inbox: m.inbox_unread, deposits: m.deposits_pending, bonus: m.bonuses_pending, kyc: m.ops_pending ? m.ops_pending.kyc : 0, accounts: m.ops_pending ? m.ops_pending.accounts : 0, money: m.ops_pending ? m.ops_pending.money : 0, broadcasts: m.broadcasts_pending, reviews: m.reviews_new, queue: C.state.queueCount };
     $$("[data-badge]").forEach(b => { const n = vals[b.dataset.badge] || 0; b.textContent = n; b.hidden = !n; });
     drawStatus();
   }
@@ -370,5 +374,5 @@
   C.start = () => { window.addEventListener("hashchange", () => { if (C.state.user && (location.hash || "").startsWith(API.routePrefix || "#/")) render(); }); boot(); };
   C.boot = boot;
 
-  Object.assign(C, { esc, $, $$, num, money, pct, fDate, fTime, fDT, ago, dur, minsTxt, digits, telHref, waHref, localInput, fromLocalInput, todayStr, debounce, isMgr, isAdmin, isMkt, isMktMgr, isSales, seesAll, canComm, roleLabel, salesUsers, stage, stagePill, tempTag, outcomeLabel, userName, csv, downloadCsv, ICONS, TL_ICON, toast, modal, confirmBox, readForm, showErrors, clearErrors, field, inp, sel, chips, listInput, splitList, bars, hbars, heat, setUnread, setQueueCount, updateBadges });
+  Object.assign(C, { esc, $, $$, num, money, pct, fDate, fTime, fDT, ago, dur, minsTxt, digits, telHref, waHref, localInput, fromLocalInput, todayStr, debounce, isMgr, isAdmin, isMkt, isMktMgr, isSales, seesAll, canComm, isOps, isKyc, roleLabel, salesUsers, stage, stagePill, tempTag, outcomeLabel, userName, csv, downloadCsv, ICONS, TL_ICON, toast, modal, confirmBox, readForm, showErrors, clearErrors, field, inp, sel, chips, listInput, splitList, bars, hbars, heat, setUnread, setQueueCount, updateBadges });
 })();

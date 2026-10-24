@@ -154,3 +154,20 @@ SELECT id, json_extract(data,'$.lead_id') AS lead_id, json_extract(data,'$.owner
   json_extract(data,'$.amount') AS amount, json_extract(data,'$.account_id') AS account_id, json_extract(data,'$.credited_at') AS credited_at,
   json_extract(data,'$.expires_at') AS expires_at, json_extract(data,'$.lots') AS lots, json_extract(data,'$.profit') AS profit, json_extract(data,'$.converted_at') AS converted_at
 FROM bonuses;
+
+-- Client area
+DROP VIEW IF EXISTS v_clients;
+CREATE VIEW v_clients AS
+SELECT id, json_extract(data,'$.lead_id') AS lead_id, json_extract(data,'$.email') AS email, json_extract(data,'$.first_name') AS first_name, json_extract(data,'$.last_name') AS last_name,
+  json_extract(data,'$.country') AS country, json_extract(data,'$.kyc.status') AS kyc_status, json_extract(data,'$.status') AS status, json_extract(data,'$.created_at') AS created_at
+FROM clients;
+DROP VIEW IF EXISTS v_accounts;
+CREATE VIEW v_accounts AS
+SELECT id, json_extract(data,'$.client_id') AS client_id, json_extract(data,'$.kind') AS kind, json_extract(data,'$.type') AS type, json_extract(data,'$.login') AS login,
+  json_extract(data,'$.status') AS status, json_extract(data,'$.balance') AS balance, json_extract(data,'$.balance_at') AS balance_at, json_extract(data,'$.opened_at') AS opened_at
+FROM accounts;
+DROP VIEW IF EXISTS v_payments;
+CREATE VIEW v_payments AS
+SELECT id, json_extract(data,'$.reference') AS reference, json_extract(data,'$.client_id') AS client_id, json_extract(data,'$.type') AS type, json_extract(data,'$.method') AS method,
+  json_extract(data,'$.amount') AS amount, json_extract(data,'$.status') AS status, json_extract(data,'$.created_at') AS created_at, json_extract(data,'$.completed_at') AS completed_at, json_extract(data,'$.ext_reference') AS ext_reference
+FROM payments;

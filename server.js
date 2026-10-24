@@ -56,6 +56,7 @@ const sendQueue = [];
 // One-click unsubscribe links in marketing emails: /unsubscribe?t=<lead id>.<signature>
 const unsubToken = id => Buffer.from(id).toString("base64url") + "." + crypto.createHmac("sha256", SESSION_SECRET).update("unsub:" + id).digest("base64url").slice(0, 22);
 const crm = createCRM({ store, hashPassword, verifyPassword, random: n => new Uint8Array(crypto.randomBytes(n)), onQueue: m => sendQueue.push(m.id),
+  hashToken: t => crypto.createHash("sha256").update(String(t)).digest("hex"),
   unsubscribeUrl: l => (crm.getSettings().site_url || "") + "/unsubscribe?t=" + unsubToken(l.id) });
 store.transaction(() => crm.ensureDefaults());
 
@@ -174,6 +175,12 @@ function serveStatic(req, res, pathname) {
     return serveFile(req, res, file, { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; media-src https: data: blob:; frame-src blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" });
   }
   if (rel.startsWith("/crm/")) return send(res, 404, "Not found"); // hide the default path when CRM_PATH is customised
+  if (rel === "/portal") return send(res, 301, "", { Location: "/portal/" });
+  if (rel.startsWith("/portal/")) {
+    const file = path.normalize(path.join(PUBLIC, rel.endsWith("/") ? rel + "index.html" : rel));
+    if (!file.startsWith(path.join(PUBLIC, "portal") + path.sep)) return send(res, 403, "Forbidden");
+    return serveFile(req, res, file, { "X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store", "Content-Security-Policy": "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; frame-src blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'" });
+  }
   if (rel.endsWith("/")) rel += "index.html";
   const file = path.normalize(path.join(PUBLIC, rel));
   if (!file.startsWith(PUBLIC + path.sep)) return send(res, 403, "Forbidden");
@@ -219,6 +226,12 @@ const RPC = {
   setDemo: (u, id, act, d) => crm.setDemo(u, id, act, d), bonusEligibility: (u, id) => crm.bonusEligibility(u, id), requestBonus: (u, id, p) => crm.requestBonus(u, id, p),
   decideBonus: (u, id, ok, p) => crm.decideBonus(u, id, ok, p), updateBonus: (u, id, p) => crm.updateBonus(u, id, p), requestBonusWithdrawal: (u, id, a) => crm.requestBonusWithdrawal(u, id, a),
   decideBonusWithdrawal: (u, id, wid, ok, why) => crm.decideBonusWithdrawal(u, id, wid, ok, why), cancelBonus: (u, id, why) => crm.cancelBonus(u, id, why), listBonuses: (u, f) => crm.listBonuses(u, f),
+  // operations back office (client area)
+  opsOverview: u => crm.opsOverview(u), listClients: (u, f) => crm.listClients(u, f), getClient: (u, id) => crm.getClient(u, id), getClientFile: (u, id) => crm.getClientFile(u, id),
+  setClientStatus: (u, id, st, why) => crm.setClientStatus(u, id, st, why), listKyc: (u, f) => crm.listKyc(u, f), decideKyc: (u, id, d, why) => crm.decideKyc(u, id, d, why),
+  listAccountRequests: (u, f) => crm.listAccountRequests(u, f), openAccount: (u, id, d) => crm.openAccount(u, id, d), rejectAccount: (u, id, why) => crm.rejectAccount(u, id, why),
+  setAccountPassword: (u, id, pw) => crm.setAccountPassword(u, id, pw), updateAccount: (u, id, d) => crm.updateAccount(u, id, d),
+  listPayments: (u, f) => crm.listPayments(u, f), decidePayment: (u, id, a, d) => crm.decidePayment(u, id, a, d), importBalances: (u, rows) => crm.importBalances(u, rows),
   approveBroadcast: (u, id, ok, why) => crm.approveBroadcast(u, id, ok, why), cancelBroadcast: (u, id) => crm.cancelBroadcast(u, id), listBroadcasts: u => crm.listBroadcasts(u), getBroadcast: (u, id) => crm.getBroadcast(u, id),
 };
 // Actions that call out to other systems (async, outside the database transaction)
@@ -272,13 +285,109 @@ async function rpc(req, res) {
   }
 }
 
+/* ------------------------------------------------------- client area (portal) */
+// Clients sign in with their email. Separate cookie (only sent to /api/portal) and a separate signing prefix,
+// so a client session can never be used against the CRM.
+const PORTAL_HOURS = Number(process.env.PORTAL_SESSION_HOURS || 8);
+const signP = d => sign("client:" + d);
+function makeClientToken(id, ver) { const body = Buffer.from(id).toString("base64url") + "." + (ver || 0) + "." + (Date.now() + PORTAL_HOURS * 3600e3); return body + "." + signP(body); }
+function sessionClient(req) {
+  const m = (req.headers.cookie || "").split(/;\s*/).find(c => c.startsWith("ag_client="));
+  const p = (m ? decodeURIComponent(m.slice(10)) : "").split("."); if (p.length !== 4) return null;
+  const a = Buffer.from(signP(p[0] + "." + p[1] + "." + p[2])), b = Buffer.from(p[3]);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b) || Number(p[2]) < Date.now()) return null;
+  const x = store.get("clients", Buffer.from(p[0], "base64url").toString());
+  if (!x || x.status !== "active" || Number(p[1]) !== (x.session_ver || 0)) return null;
+  return { id: x.id };
+}
+const clientCookie = (v, age) => `ag_client=${encodeURIComponent(v)}; Path=/api/portal; HttpOnly; SameSite=Strict; Max-Age=${age}${IS_PROD ? "; Secure" : ""}`;
+const regLimit = limiter(6, 60 * 60e3), forgotLimit = limiter(6, 60 * 60e3);
+const siteUrl = () => (crm.getSettings().site_url || "").replace(/\/+$/, "") || "http://localhost:" + PORT;
+const brand = () => ((crm.getSettings().portal || {}).brand) || "Absel Global";
+// Verification and reset links are emailed directly and never stored in the message log
+async function sendClientLink(kind, to, firstName, token) {
+  const link = siteUrl() + "/portal/#" + kind + "?t=" + encodeURIComponent(token);
+  const subject = kind === "verify" ? `Confirm your email for ${brand()}` : `Reset your ${brand()} password`;
+  const text = kind === "verify" ? `Hi ${firstName},\n\nWelcome to ${brand()}. Confirm your email to open your trading account:\n${link}\n\nThe link works for 48 hours. If you didn't sign up, ignore this email.\n\nThe ${brand()} team`
+    : `Hi ${firstName},\n\nSomeone asked to reset the password for your ${brand()} client area. To choose a new password, open:\n${link}\n\nThe link works for 1 hour. If it wasn't you, ignore this email; your password stays the same.\n\nThe ${brand()} team`;
+  try { await channels.sendEmail(to, subject, text); return null; }
+  catch (e) { if (!IS_PROD) { console.log(`  [dev] ${kind} link for ${to}: ${link}`); return link; } console.error("Client email failed:", e.message); return null; }
+}
+const PORTAL_RPC = {
+  me: c => crm.portalMe(c), updateProfile: (c, p) => crm.portalUpdateProfile(c, p), uploadKyc: (c, f) => crm.portalUploadKyc(c, f), getFile: (c, id) => crm.portalGetFile(c, id),
+  requestAccount: (c, p) => crm.portalRequestAccount(c, p), revealPassword: (c, id) => crm.portalRevealPassword(c, id),
+  deposit: (c, d) => crm.portalDeposit(c, d), withdraw: (c, d) => crm.portalWithdraw(c, d), transfer: (c, d) => crm.portalTransfer(c, d), cancel: (c, id) => crm.portalCancel(c, id), history: (c, f) => crm.portalHistory(c, f),
+  totpBegin: c => crm.portalTotpBegin(c), totpEnable: (c, code) => crm.portalTotpEnable(c, code), totpDisable: (c, code) => crm.portalTotpDisable(c, code),
+};
+const portalErr = (res, e) => { if (e instanceof CrmError) return send(res, e.code === 401 ? 401 : e.code === 404 ? 404 : e.code === 403 ? 403 : 422, { ok: false, error: e.message, fields: e.fields }); throw e; };
+async function portal(req, res, p) {
+  if (req.headers["x-requested-with"] !== "absel-portal") return send(res, 403, { ok: false, error: "Forbidden" }); // CSRF guard
+  const ip = clientIp(req), meta = { ip, ua: clean(req.headers["user-agent"], 200) };
+  try {
+    if (p === "register") {
+      if (!regLimit(ip)) return send(res, 429, { ok: false, error: "Too many sign-ups from this network. Try again later." });
+      const b = await readJson(req, 20480);
+      if (b.website) return send(res, 200, { ok: true }); // honeypot
+      if (RESTRICTED.has(clean(b.country, 80))) return send(res, 422, { ok: false, error: RESTRICTED_MSG + ".", fields: { country: RESTRICTED_MSG } });
+      const r = store.transaction(() => crm.portalRegister(b, meta)); drainQueue();
+      const dev = await sendClientLink("verify", r.client.email, r.client.first_name, r.verify_token);
+      return send(res, 201, { ok: true, dev_link: dev || undefined }, { "Set-Cookie": clientCookie(makeClientToken(r.client.id, 0), PORTAL_HOURS * 3600) });
+    }
+    if (p === "login") {
+      if (!loginLimit(ip)) return send(res, 429, { ok: false, error: "Too many attempts from this network. Try again in 15 minutes." });
+      const b = await readJson(req, 4096), email = clean(b.email, 160).toLowerCase(), password = String(b.password || "").slice(0, 200), code = clean(b.code, 10);
+      const generic = () => send(res, 401, { ok: false, error: "Wrong email or password." });
+      const { client } = crm.portalAuthLookup(email);
+      if (!client) { verifyPassword(password, DUMMY_HASH); return generic(); }
+      if (client.locked) { const mins = Math.max(1, Math.ceil((Date.parse(client.locked_until) - Date.now()) / 60000)); return send(res, 423, { ok: false, error: `Too many wrong attempts. Try again in ${mins} min or reset your password.` }); }
+      if (!client.active) { verifyPassword(password, DUMMY_HASH); return send(res, 403, { ok: false, error: "This account is suspended. Contact support." }); }
+      if (!verifyPassword(password, client.password_hash)) { store.transaction(() => crm.portalAuthResult(email, "bad_password", meta)); return generic(); }
+      if (client.totp_enabled) {
+        if (!code) return send(res, 200, { ok: false, need_code: true });
+        if (!crm.portalTotpCheck(client.id, code)) { store.transaction(() => crm.portalAuthResult(email, "bad_code", meta)); return send(res, 401, { ok: false, need_code: true, error: "That code is wrong or expired." }); }
+      }
+      const r = store.transaction(() => crm.portalAuthResult(email, "ok", meta));
+      return send(res, 200, { ok: true }, { "Set-Cookie": clientCookie(makeClientToken(r.id, r.session_ver), PORTAL_HOURS * 3600) });
+    }
+    if (p === "logout") return send(res, 200, { ok: true }, { "Set-Cookie": clientCookie("", 0) });
+    if (p === "verify") { const b = await readJson(req, 2048); store.transaction(() => crm.portalVerifyEmail(b.token)); return send(res, 200, { ok: true }); }
+    if (p === "forgot") {
+      if (!forgotLimit(ip)) return send(res, 429, { ok: false, error: "Too many requests. Try again later." });
+      const b = await readJson(req, 2048), r = store.transaction(() => crm.portalForgot(clean(b.email, 160)));
+      const dev = r ? await sendClientLink("reset", r.email, r.first_name, r.reset_token) : null;
+      return send(res, 200, { ok: true, dev_link: dev || undefined }); // same answer whether or not the email exists
+    }
+    if (p === "reset") {
+      if (!loginLimit(ip)) return send(res, 429, { ok: false, error: "Too many attempts. Try again later." });
+      const b = await readJson(req, 4096); store.transaction(() => crm.portalReset(b.token, String(b.password || ""))); return send(res, 200, { ok: true });
+    }
+    const c = sessionClient(req);
+    if (!c) return send(res, 401, { ok: false, error: "Please sign in." }, { "Set-Cookie": clientCookie("", 0) });
+    if (p === "resend") { const r = store.transaction(() => crm.portalResendVerify(c)); const dev = await sendClientLink("verify", r.email, r.first_name, r.verify_token); return send(res, 200, { ok: true, dev_link: dev || undefined }); }
+    if (p === "password") {
+      if (!loginLimit(ip)) return send(res, 429, { ok: false, error: "Too many attempts. Try again later." });
+      const b = await readJson(req, 4096), x = store.get("clients", c.id);
+      if (!verifyPassword(String(b.current || ""), x.password_hash)) return send(res, 422, { ok: false, error: "Your current password is wrong.", fields: { current: "Wrong password" } });
+      const r = store.transaction(() => crm.portalSetPassword(c, String(b.password || ""), null));
+      return send(res, 200, { ok: true }, { "Set-Cookie": clientCookie(makeClientToken(c.id, r.session_ver), PORTAL_HOURS * 3600) });
+    }
+    if (p === "rpc") {
+      const b = await readJson(req, 9 * 1024 * 1024), fn = PORTAL_RPC[b.method];
+      if (!fn) return send(res, 404, { ok: false, error: "Unknown action" });
+      const result = store.transaction(() => fn(c, ...(Array.isArray(b.args) ? b.args : []))); drainQueue();
+      return send(res, 200, { ok: true, result });
+    }
+    return send(res, 404, { ok: false, error: "Not found" });
+  } catch (e) { return portalErr(res, e); }
+}
+
 /* ---------------------------------------------------------------- routes */
 async function publicLead(req, res) {
   if (!leadLimit(clientIp(req))) return send(res, 429, { ok: false, error: "Too many requests. Please try again in a few minutes." });
   const b = await readJson(req, 20480);
   if (b.website) return send(res, 201, { ok: true, reference: "AG-" + crypto.randomBytes(3).toString("hex").toUpperCase() }); // honeypot
   if (b.consent !== true) return send(res, 422, { ok: false, errors: { consent: "Consent is required" } });
-  if (RESTRICTED.has(clean(b.country, 80))) return send(res, 422, { ok: false, errors: { country: "Absel Markets does not accept clients from this country" } });
+  if (RESTRICTED.has(clean(b.country, 80))) return send(res, 422, { ok: false, errors: { country: "Absel Global does not accept clients from this country" } });
   delete b.sample; delete b.reference; delete b.tags;
   try {
     const l = store.transaction(() => crm.createLead(crm.SYSTEM, Object.assign({}, b, { ip: clientIp(req), user_agent: req.headers["user-agent"] }), { source: "web" }));
@@ -348,7 +457,7 @@ async function changePassword(req, res) {
 }
 
 /* ------------------------------------------------- lead sources (ads, partners, Zapier) */
-const RESTRICTED_MSG = "Absel Markets does not accept clients from this country";
+const RESTRICTED_MSG = "Absel Global does not accept clients from this country";
 function intake(data, source, res) {
   if (RESTRICTED.has(clean(data.country, 80))) return send(res, 422, { ok: false, error: RESTRICTED_MSG });
   delete data.sample; delete data.reference;
@@ -424,9 +533,9 @@ async function unsubscribe(req, res, url) {
   if (!l) return page("Link not valid", "This unsubscribe link is incomplete or has expired. Reply to any of our emails with “unsubscribe” and we'll remove you.");
   if (req.method === "POST") {
     store.transaction(() => crm.unsubscribeLead(l.id, "email", "unsubscribe link"));
-    return page("You're unsubscribed", "You won't receive marketing emails from Absel Markets any more. Your account specialist may still contact you about an open request.");
+    return page("You're unsubscribed", "You won't receive marketing emails from Absel Global any more. Your account specialist may still contact you about an open request.");
   }
-  return page("Unsubscribe from Absel Markets emails?", "Click below to stop marketing emails to this address.", `<form method="post"><button type="submit">Unsubscribe</button></form>`);
+  return page("Unsubscribe from Absel Global emails?", "Click below to stop marketing emails to this address.", `<form method="post"><button type="submit">Unsubscribe</button></form>`);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -443,6 +552,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/crm/password" && m === "POST") return await changePassword(req, res);
     if (p === "/api/crm/logout" && m === "POST") return send(res, 200, { ok: true }, { "Set-Cookie": cookie("", 0) });
     if (p === "/api/crm/rpc" && m === "POST") return await rpc(req, res);
+    if (p.startsWith("/api/portal/") && m === "POST") return await portal(req, res, p.slice(12));
     if (p.startsWith("/api/")) return send(res, 404, { ok: false, error: "Not found" });
     if (m !== "GET" && m !== "HEAD") return send(res, 405, "Method not allowed");
     return serveStatic(req, res, p);
@@ -457,6 +567,7 @@ server.listen(PORT, () => {
   const c = channels.status();
   console.log(`✔ Absel Global running on http://localhost:${PORT}`);
   console.log(`  CRM:        http://localhost:${PORT}${CRM_PATH}/`);
+  console.log(`  Client area: http://localhost:${PORT}/portal/`);
   console.log(`  Database:   ${DB_FILE}`);
   console.log(`  Email:      ${c.email.configured ? c.email.provider + " (" + c.email.from + ")" : "not configured — messages are logged as skipped"}`);
   console.log(`  WhatsApp:   ${c.whatsapp.configured ? "Cloud API connected" : "not configured — messages are logged as skipped"}`);

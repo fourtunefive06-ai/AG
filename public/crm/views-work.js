@@ -38,7 +38,7 @@
 
   /* ============================================================ SCRIPT */
   const OBJECTIONS = {
-    "Regulation / trust": "Absel Markets is licensed by the Financial Services Commission of Mauritius under licence GB25205423, with both a Global Business and an Investment Dealer licence. Client money sits in segregated bank accounts, separate from company funds, and there is professional indemnity insurance. I can send you the licence PDF on WhatsApp right now.",
+    "Regulation / trust": "Absel Global is a trading name of Absel Markets, which is licensed by the Financial Services Commission of Mauritius under licence GB25205423, with both a Global Business and an Investment Dealer licence. Client money sits in segregated bank accounts, separate from company funds, and there is professional indemnity insurance. I can send you the licence PDF on WhatsApp right now.",
     "Spreads & costs": "On the ECN account spreads start from 0.2 pips with a commission from $7 per lot. If you prefer no commission, the STP account starts from 0.9 pips. There are no deposit fees. Which instruments do you trade most? I'll tell you what that means for your costs.",
     "Deposit methods": "You can fund by Visa or Mastercard, bank wire, USDT, Skrill, Neteller or UnionPay, with 0% deposit fees. Most card and e-wallet deposits arrive instantly.",
     "Withdrawal speed": "Withdrawals go back to the method you deposited with once your account is verified. Our team processes requests on business days, and I'll personally follow up on your first one.",
@@ -52,14 +52,14 @@
   function scriptPanel(l, j) {
     const p = l.profile || {}, agent = C.state.user.name.split(" ")[0], first = esc(l.first_name);
     const open = {
-      new: `Hi ${first}, this is ${esc(agent)} from Absel Markets. You asked for a call back about opening a trading account. Do you have 3 minutes now?`,
-      attempting: `Hi ${first}, it's ${esc(agent)} from Absel Markets. I tried you earlier about your account request. Is now a better time?`,
-      contacted: `Hi ${first}, ${esc(agent)} from Absel Markets again, following up on our last call. Did you get a chance to look at the details I sent?`,
+      new: `Hi ${first}, this is ${esc(agent)} from Absel Global. You asked for a call back about opening a trading account. Do you have 3 minutes now?`,
+      attempting: `Hi ${first}, it's ${esc(agent)} from Absel Global. I tried you earlier about your account request. Is now a better time?`,
+      contacted: `Hi ${first}, ${esc(agent)} from Absel Global again, following up on our last call. Did you get a chance to look at the details I sent?`,
       qualified: `Hi ${first}, ${esc(agent)} here. You were ready to open your ${esc(p.account_type || "trading")} account. Shall we complete the registration together now? It takes about 3 minutes.`,
       registered: `Hi ${first}, congratulations on registering. The next step is uploading your ID and proof of address. Can I guide you through it now?`,
       kyc: `Hi ${first}, your account is verified. Shall I help you make your first deposit so you're ready to trade?`,
       funded: `Hi ${first}, thanks for funding your account. How is your trading going? Do you need help with MT5?`,
-    }[l.stage] || `Hi ${first}, this is ${esc(agent)} from Absel Markets.`;
+    }[l.stage] || `Hi ${first}, this is ${esc(agent)} from Absel Global.`;
     const close = { qualified: "Send the registration link on WhatsApp and stay on the line while they complete it.", registered: "Walk them through KYC upload in the client area.", kyc: "Help them choose a deposit method and confirm the amount.", funded: "Offer MT5 setup help and ask for referrals." }[l.stage] || "Agree a clear next step: registration now, or a fixed call-back time.";
     const JO = C.journeyObjections ? C.journeyObjections() : {}, ALL = Object.assign({}, OBJECTIONS, JO), js = C.journeyScript ? C.journeyScript(l, j) : "";
     const inJourney = j && (j.demo || j.bonus);
@@ -345,7 +345,7 @@
       const qa = Object.entries(d.qa || {}).filter(([, v]) => v !== "" && !(Array.isArray(v) && !v.length));
       if (qa.length) body += `<div class="qa">${qa.map(([k, v]) => `<span>${esc((meta().qa_fields.find(f => f.id === k) || { label: k }).label)}: <b>${esc(Array.isArray(v) ? v.join(", ") : v)}</b></span>`).join("")}</div>`;
     } else if (a.type === "note") { head = `<b>Note</b> · ${who}`; body = esc(d.text); }
-    else if (a.type === "message") { head = d.direction === "in" ? `<b>Client replied</b> on ${esc(d.channel)}` : `<b>${esc(d.channel === "email" ? "Email" : "WhatsApp")}</b> ${esc(d.template || "")} · ${d.rule_id ? "automation" : a.user_id === "system" ? "broadcast" : who} · <span class="c-pill plain" style="--c:${msgColor(d.status)}">${esc(d.status)}</span>`; body = esc(d.subject ? d.subject + " — " : "") + esc(d.preview || ""); }
+    else if (a.type === "message") { head = d.direction === "in" ? `<b>Client replied</b> on ${esc(d.channel)}` : `<b>${esc(d.channel === "email" ? "Email" : "WhatsApp")}</b> ${esc(d.template || "")} · ${d.transactional ? "client area notice" : d.rule_id ? "automation" : a.user_id === "system" ? "broadcast" : who} · <span class="c-pill plain" style="--c:${msgColor(d.status)}">${esc(d.status)}</span>`; body = esc(d.subject ? d.subject + " — " : "") + esc(d.preview || ""); }
     else if (a.type === "stage") { head = `<b>Stage:</b> ${esc(C.stage(d.from).label)} → ${esc(C.stage(d.to).label)} · ${who}`; body = [d.reason, d.deposit ? "Deposit " + money(d.deposit) : "", d.note].filter(Boolean).map(esc).join(" · "); }
     else if (a.type === "assign") { head = `<b>Assigned</b> to ${esc(userName(d.to))}${d.from ? " (was " + esc(userName(d.from)) + ")" : ""}`; body = esc(d.via || ""); }
     else if (a.type === "created") { head = `<b>Lead created</b> from ${esc(d.form || d.source)}`; body = d.duplicate_of ? "Repeat enquiry: same email or phone as an earlier lead." : ""; }
@@ -358,6 +358,7 @@
     else if (a.type === "merge") { head = `<b>Merged</b> duplicate leads · ${who}`; body = esc((d.merged || []).join(", ")); }
     else if (a.type === "pbx") { head = `<b>${d.status === "missed" ? "Missed incoming call" : "Incoming call"}</b>${d.duration_sec ? " · " + dur(d.duration_sec) : ""}`; body = d.recording_url ? `<audio controls preload="none" src="${esc(d.recording_url)}"></audio>` : ""; }
     else if (a.type === "demo") { head = `<b>${esc(d.label || "Demo")}</b> · ${who}`; body = esc([d.login ? "login " + d.login : "", d.feedback].filter(Boolean).join(" · ")); }
+    else if (a.type === "portal") { head = `<b>Client area:</b> ${esc(d.label || "")}${a.user_id !== "system" ? " · " + who : ""}`; }
     else if (a.type === "bonus") { head = `<b>${esc(d.label || "Company-funded account")}</b> · ${who}`; }
     else head = `<b>${esc(a.type)}</b>`;
     return `<li><span class="ic ${esc(a.type)}">${TL_ICON[a.type] || ICONS.note}</span><div><div class="hd">${head}${when}</div>${body ? `<div class="bd">${body}</div>` : ""}</div></li>`;
@@ -461,6 +462,7 @@
           <div style="display:grid;gap:16px;align-content:start">
             ${showCheck ? checklistCard(l) : ""}
             ${d.deposits.length ? `<div class="c-card" id="lDeps"><h3>First deposit</h3>${d.deposits.map(x => depRow(x)).join("")}</div>` : ""}
+            ${C.portalCard ? C.portalCard(d) : ""}
             ${C.journeyCards(d)}
             <div class="c-card"><h3>Contact ${work ? '<button class="c-btn sm" data-a="edit">Edit</button>' : ""}</h3><dl class="c-dl">
               <dt>Phone</dt><dd class="mono">${esc(l.dial_code)} ${esc(l.phone)}</dd><dt>Email</dt><dd>${esc(l.email || "—")}</dd>

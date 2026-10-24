@@ -31,6 +31,9 @@ const team = [
   ["Mai Tran", "mai", "agent", "SEA desk", ["Vietnamese", "English"]],
   ["Nadia Rahman", "nadia", "marketing_manager", "Marketing", []],
   ["Omar Haddad", "omar", "marketing", "Marketing", []],
+  ["Fatima Noor", "fatima", "operations", "Operations", []],
+  ["Ali Hassan", "ali", "operations", "Operations", []],
+  ["Joy Atieno", "joy", "compliance", "Compliance", []],
 ].map(([name, username, role, t, langs], i) => crm.saveUser(ADMIN, { name, username, role, team: t, languages: langs, email: username + "@abselglobal.com", phone: "+971 50 555 01" + (10 + i), accepts_leads: role === "agent", target_ftd: role === "agent" ? 8 : 0, target_amount: role === "agent" ? 8000 : 0, extension: role === "agent" ? String(201 + i) : "", password: "demo-pass-123", must_change_password: false }));
 const U = Object.fromEntries(team.map(u => [u.username, u]));
 const MGR = U.sara;
@@ -324,9 +327,91 @@ assert(!crm.bonusEligibility(MGR, dupe.id).ok, "same phone can't get a second ac
 assert(store.all("jobs").some(j => j.rule_id === "auto_bonus_ended" && j.lead_id === jl.id));
 assert.throws(() => crm.updateBonus(jo, bq.id, { lots: 3 }), /Only active/);
 const seg = crm.previewSegment(MKT, { journey: "bonus_expired" }, "whatsapp"); assert(seg.count >= 0);
+// client area: register → verify → KYC → live account → deposit (FTD) → withdrawal with two approvals
+{
+  const OPS = U.fatima, OPS2 = U.ali, CMP = U.joy, PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const pl = store.all("leads").find(l => l.stage === "contacted" && l.owner_id && l.email && !l.dnc && !l.client_id);
+  const reg = crm.portalRegister({ first_name: pl.first_name, last_name: pl.last_name, email: pl.email.toUpperCase(), dial_code: pl.dial_code, phone: pl.phone, country: pl.country, password: "Client-pass-2026", terms: true });
+  assert.strictEqual(reg.client.lead_id, pl.id, "client linked to the existing lead"); assert(store.get("leads", pl.id).client_id === reg.client.id);
+  assert.throws(() => crm.portalRegister({ first_name: "A", last_name: "B", email: pl.email, dial_code: "+1", phone: "5551234", country: "Kenya", password: "Client-pass-2026", terms: true }), /already an account/);
+  assert.throws(() => crm.portalRegister({ first_name: "A", last_name: "B", email: "x@example.com", dial_code: "+1", phone: "5551234", country: "Kenya", password: "short", terms: true }), /10 characters/);
+  const C = { id: reg.client.id };
+  assert.throws(() => crm.portalRequestAccount(C, { type: "ecn", leverage: 100 }), /Verify your email/);
+  crm.portalVerifyEmail(reg.verify_token); assert.throws(() => crm.portalVerifyEmail(reg.verify_token), /expired/);
+  assert.throws(() => crm.portalRequestAccount(C, { type: "ecn", leverage: 100 }), /documents first/);
+  const demo = crm.portalRequestAccount(C, { type: "stp", leverage: 100, kind: "demo" }); assert.strictEqual(demo.status, "requested");
+  crm.portalUploadKyc(C, { kind: "kyc_id", name: "passport.png", data: PNG }); assert.strictEqual(store.get("clients", C.id).kyc.status, "none");
+  crm.portalUploadKyc(C, { kind: "kyc_address", name: "bill.png", data: PNG }); assert.strictEqual(store.get("clients", C.id).kyc.status, "pending");
+  assert.throws(() => crm.decideKyc(U.daniel, C.id, "approved"), /compliance/i);
+  assert.throws(() => crm.decideKyc(CMP, C.id, "rejected"), /what's wrong/);
+  crm.decideKyc(CMP, C.id, "approved"); assert.strictEqual(store.get("leads", pl.id).stage, "kyc", "KYC approval moves the lead");
+  assert(store.all("messages").some(m => m.lead_id === pl.id && m.template_id === "tpl_portal_kyc_ok"));
+  const acc = crm.portalRequestAccount(C, { type: "ecn", leverage: 200 });
+  assert.throws(() => crm.openAccount(CMP, acc.id, { login: "7001234" }), /operations/i);
+  crm.openAccount(OPS, acc.id, { login: "7001234", server: "AbselGlobal-Live", password: "Mt5-Temp-99" });
+  crm.openAccount(OPS, demo.id, { login: "9001234", server: "AbselGlobal-Demo", password: "Demo-1" }); assert(store.get("leads", pl.id).demo.given_at);
+  assert.strictEqual(crm.portalRevealPassword(C, acc.id).password, "Mt5-Temp-99"); assert.throws(() => crm.portalRevealPassword(C, acc.id), /already shown/);
+  assert(!JSON.stringify(crm.getClient(OPS, C.id)).includes("Mt5-Temp-99"), "staff never see the MT5 password");
+  assert.throws(() => crm.portalDeposit(C, { account_id: acc.id, method: "usdt", amount: 20 }), /minimum/);
+  const dp = crm.portalDeposit(C, { account_id: acc.id, method: "usdt", amount: 600, proof: { name: "tx.png", data: PNG } }); assert(dp.reference.startsWith("D-"));
+  assert.throws(() => crm.decidePayment(U.sara, dp.id, "complete", { reference: "X" }), /operations/i);
+  assert.throws(() => crm.decidePayment(OPS, dp.id, "complete", {}), /reference/);
+  crm.decidePayment(OPS, dp.id, "complete", { reference: "TRC-abc123", amount: 600 });
+  const fl2 = store.get("leads", pl.id); assert.strictEqual(fl2.stage, "funded", "first client-area deposit is a verified FTD"); assert.strictEqual(fl2.deposit_amount, 600);
+  assert(store.all("deposits").some(d => d.lead_id === pl.id && d.status === "verified"));
+  assert.strictEqual(store.get("accounts", acc.id).balance, 600);
+  assert.throws(() => crm.portalWithdraw(C, { account_id: acc.id, method: "usdt", amount: 900, details: "TXYZ" }), /available balance/);
+  crm.importBalances(OPS, [{ login: "7001234", balance: 2400, equity: 2380 }, { login: "1111", balance: 5 }]);
+  const wd = crm.portalWithdraw(C, { account_id: acc.id, method: "usdt", amount: 1500, details: "TRC20 wallet TXYZ123" });
+  assert.throws(() => crm.portalWithdraw(C, { account_id: acc.id, method: "usdt", amount: 1000, details: "TXYZ" }), /available balance/, "pending withdrawals are reserved");
+  assert.throws(() => crm.decidePayment(OPS, wd.id, "complete", { reference: "R" }), /two approvals/);
+  assert.strictEqual(crm.decidePayment(OPS, wd.id, "approve").status, "first_approved");
+  assert.throws(() => crm.decidePayment(OPS, wd.id, "approve"), /second person/);
+  assert.strictEqual(crm.decidePayment(OPS2, wd.id, "approve").status, "approved");
+  assert.throws(() => crm.portalCancel(C, wd.id), /already being processed/);
+  crm.decidePayment(OPS, wd.id, "complete", { reference: "TRC-out-1" }); assert.strictEqual(store.get("accounts", acc.id).balance, 900);
+  const acc2 = crm.portalRequestAccount(C, { type: "islamic", leverage: 100 }); crm.openAccount(OPS, acc2.id, { login: "7001235" });
+  const tr = crm.portalTransfer(C, { account_id: acc.id, to_account_id: acc2.id, amount: 300 }); crm.decidePayment(OPS2, tr.id, "complete", {});
+  assert.strictEqual(store.get("accounts", acc2.id).balance, 300);
+  const me = crm.portalMe(C); assert(me.accounts.length === 3 && me.totals.deposits === 600 && me.totals.withdrawals === 1500 && !JSON.stringify(me).includes("pw_once"));
+  assert(!JSON.stringify(me).includes("Absel Markets") || JSON.stringify(me.config.legal_line).includes("trading name"), "client sees the Absel Global brand");
+  assert(crm.getLead(U.sara, pl.id).portal.accounts.length === 3, "sales sees client-area status on the lead");
+  assert(crm.listClients(store.get("users", pl.owner_id), {}).every(x => store.get("leads", x.lead_id).owner_id === pl.owner_id), "agents only see their own clients");
+  const ov = crm.opsOverview(OPS); assert(ov.money.dep_month >= 600 && ov.clients.funded >= 1);
+  // sign-in lockout
+  for (let i = 0; i < 5; i++) crm.portalAuthResult(pl.email, "bad_password", {}); assert(crm.portalAuthLookup(pl.email).client.locked);
+  crm.setClientStatus(OPS, C.id, "active"); assert(!crm.portalAuthLookup(pl.email).client.locked);
+  const fg = crm.portalForgot(pl.email); crm.portalReset(fg.reset_token, "New-client-pass-1"); assert.throws(() => crm.portalReset(fg.reset_token, "New-client-pass-2"), /expired/);
+}
 console.log("Journey:", { demos: demos.length, credited: B.filter(b => b.credited_at).length, converted: B.filter(b => b.status === "converted").length, conversion: jr.programme.conversion + "%", cost: jr.programme.total_cost, cost_per_ftd: jr.programme.cost_per_ftd });
 console.log("Deposits:", { verified: verified.length, pending: store.all("deposits").filter(d => d.status === "pending").length, rejected: store.all("deposits").filter(d => d.status === "rejected").length }, "| reviews", store.size("reviews"), "| attendance days", store.size("attendance"), "| broadcast msgs", store.all("messages").filter(m => m.broadcast_id).length);
 console.log("✔ all checks passed");
+
+/* ---------- demo data for the client area: a few clients at every step, so each ops queue has work ---------- */
+{
+  const OPS = U.fatima, OPS2 = U.ali, CMP = U.joy, PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const pool = store.all("leads").filter(l => l.email && !l.client_id && !l.dnc && ["contacted", "qualified", "registered", "kyc", "funded"].includes(l.stage)).sort((a, b) => ({ kyc: 0, registered: 1, qualified: 2, contacted: 3, funded: 4 })[a.stage] - ({ kyc: 0, registered: 1, qualified: 2, contacted: 3, funded: 4 })[b.stage]).slice(0, 18);
+  pool.forEach((l, i) => {
+    T += 7 * 60000;
+    const r = crm.portalRegister({ first_name: l.first_name, last_name: l.last_name, email: l.email, dial_code: l.dial_code, phone: l.phone, country: l.country, password: "Client-pass-2026", terms: true }), C = { id: r.client.id };
+    if (i % 6 !== 5) crm.portalVerifyEmail(r.verify_token);
+    if (i % 6 === 5) return;                                                     // registered, email not verified
+    crm.portalUploadKyc(C, { kind: "kyc_id", name: "id-card.png", data: PNG });
+    if (i % 6 === 4) return;                                                     // documents half done
+    crm.portalUploadKyc(C, { kind: "kyc_address", name: "utility-bill.png", data: PNG });
+    if (i % 6 === 3) return;                                                     // waiting for KYC review
+    crm.decideKyc(CMP, C.id, "approved");
+    const t = ["ecn", "stp", "islamic", "ecn"][i % 4], a = crm.portalRequestAccount(C, { type: t, leverage: 100 });
+    if (i % 6 === 2) return;                                                     // waiting for an account
+    crm.openAccount(OPS, a.id, { login: String(7100000 + i), server: "AbselGlobal-Live", password: "Mt5-" + (1000 + i) });
+    const amt = [250, 500, 1000, 300, 2000, 750][i % 6];
+    const d = crm.portalDeposit(C, { account_id: a.id, method: ["usdt", "bank", "card", "skrill"][i % 4], amount: amt, proof: { name: "receipt.png", data: PNG } });
+    if (i % 6 === 1) return;                                                     // deposit waiting for operations
+    crm.decidePayment(OPS, d.id, "complete", { reference: "AM-" + (880000 + i) });
+    if (i === 0) { crm.importBalances(OPS, [{ login: String(7100000 + i), balance: 3400, equity: 3350 }]); const w = crm.portalWithdraw(C, { account_id: a.id, method: "usdt", amount: 1200, details: "USDT TRC20 TQx8...9k" }); crm.decidePayment(OPS, w.id, "approve"); }
+    if (i === 6) { const w = crm.portalWithdraw(C, { account_id: a.id, method: "bank", amount: 150, details: "IBAN KE12 3456 7890 · Equity Bank" }); }
+  });
+}
 
 /* ---------- export: shift dates so the month ends "now", then dump or load ---------- */
 function shiftDates(obj, delta) {
@@ -352,6 +437,6 @@ if (arg("--dump") || arg("--db")) {
     const db = openStore(path.resolve(arg("--db")), path.join(__dirname, "..", "db", "schema.sql"));
     if (db.all("leads").length) { console.error("✖ That database already has leads. Use a new file."); process.exit(1); }
     db.transaction(() => { for (const c of COLS) for (const o of data[c]) { if (c === "users") { o.password_hash = h; o.must_change_password = false; } db.put(c, o); } });
-    console.log(`✔ Demo database written to ${arg("--db")}. Sign in as admin, sara (sales manager), daniel / grace / chinedu / rahul / yousef / mai (agents), nadia (marketing manager) or omar (marketing) with password: ${pw}`);
+    console.log(`✔ Demo database written to ${arg("--db")}. Sign in as admin, sara (sales manager), daniel / grace / chinedu / rahul / yousef / mai (agents), nadia (marketing manager), omar (marketing), fatima / ali (operations) or joy (compliance) with password: ${pw}`);
   }
 }

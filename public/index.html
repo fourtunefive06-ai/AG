@@ -6,7 +6,7 @@
 <!--FRAGMENT-START-->
 <title>Absel Global</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Open a trading account with Absel Markets, an FSC Mauritius licensed broker. Forex, indices, commodities, futures and crypto CFDs on MetaTrader 5.">
+<meta name="description" content="Open a trading account with Absel Global. Forex, indices, commodities, futures and crypto CFDs on MetaTrader 5.">
 <meta name="theme-color" content="#162040">
 <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
@@ -370,8 +370,8 @@ footer a:hover{color:var(--band-fg)}
 <script>
 window.ABSEL_CONFIG = {
   leadEndpoint: "/api/leads",  // the Node backend (server.js). Change only if you post leads somewhere else.
-  registerUrl: "https://client.abselmarkets.com/register",
-  loginUrl: "https://client.abselmarkets.com",
+  registerUrl: "/portal/#register",
+  loginUrl: "/portal/",
   whatsapp: "447576077989",
   popupDelaySeconds: 35,       // auto-open the popup once per visit after this many seconds (0 = off)
   exitIntent: true,            // open the popup once when a desktop visitor moves to leave
@@ -395,7 +395,7 @@ window.ABSEL_CONFIG = {
       <a href="#faq">FAQ</a>
     </nav>
     <div class="head-actions">
-      <a class="login" data-cfg-href="loginUrl" href="https://client.abselmarkets.com" target="_blank" rel="noopener">Log in</a>
+      <a class="login" data-cfg-href="loginUrl" href="/portal/">Log in</a>
       <button class="btn btn-cta" data-open-lead>Open account</button>
     </div>
   </div>
@@ -507,7 +507,7 @@ window.ABSEL_CONFIG = {
     <div class="copy">
       <span class="eyebrow">Platform</span>
       <h2>MetaTrader 5, wherever you trade.</h2>
-      <p>Absel Markets is an authorised MT5 broker. Advanced charting, Depth of Market, algorithmic trading with MQL5, and VPS hosting to keep your Expert Advisors running 24/5.</p>
+      <p>Absel Global gives you the full MetaTrader 5 platform. Advanced charting, Depth of Market, algorithmic trading with MQL5, and VPS hosting to keep your Expert Advisors running 24/5.</p>
       <div class="devices">
         <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8"/></svg>Windows</span>
         <span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/></svg>WebTrader</span>
@@ -599,15 +599,15 @@ window.ABSEL_CONFIG = {
 <!-- =================== FAQ =================== -->
 <section class="block platform" id="faq">
   <div class="wrap faq-grid">
-    <div class="intro"><span class="eyebrow">FAQ</span><h2>Questions before you start.</h2><p>Our team answers on WhatsApp and at support@abselmarkets.com, Monday to Friday.</p><button class="btn btn-cta" data-open-lead>Request a call back</button></div>
+    <div class="intro"><span class="eyebrow">FAQ</span><h2>Questions before you start.</h2><p>Our team answers on WhatsApp and at support@abselglobal.com, Monday to Friday.</p><button class="btn btn-cta" data-open-lead>Request a call back</button></div>
     <div>
-      <details><summary>Who will hold my account?</summary><p>Your account is opened with Absel Markets, licensed by the Financial Services Commission of Mauritius under licence no. GB25205423. Absel Global is Absel Markets' client registration site.</p></details>
-      <details><summary>Is my money safe?</summary><p>Client funds are held in segregated bank accounts, separate from Absel Markets' own operational funds, as the FSC requires. Professional indemnity insurance adds a further layer of protection. Trading itself carries risk and you can lose money.</p></details>
+      <details><summary>Who will hold my account?</summary><p>Absel Global is a trading name of Absel Markets, licensed by the Financial Services Commission of Mauritius under licence no. GB25205423. Your account and your money are held by the licensed company.</p></details>
+      <details><summary>Is my money safe?</summary><p>Client funds are held in segregated bank accounts, separate from the company's own operational funds, as the FSC requires. Professional indemnity insurance adds a further layer of protection. Trading itself carries risk and you can lose money.</p></details>
       <details><summary>STP or ECN: which should I choose?</summary><p>STP has no commission, with spreads from 0.9 pips. ECN offers raw spreads from 0.2 pips plus a commission from $7 per lot. Scalpers, EA users and high-volume traders usually prefer ECN.</p></details>
       <details><summary>Which platform will I trade on?</summary><p>MetaTrader 5 on Windows, in your web browser, and on iOS and Android, with optional VPS hosting for Expert Advisors.</p></details>
       <details><summary>Do you offer swap-free accounts?</summary><p>Yes. Islamic accounts are Sharia-compliant with no overnight swap charges.</p></details>
-      <details><summary>How do I deposit?</summary><p>Visa, Mastercard, bank wire, USDT, Skrill, Neteller and UnionPay. Absel Markets charges 0% on deposits.</p></details>
-      <details><summary>Which countries can't open an account?</summary><p>Absel Markets does not accept residents of the United Arab Emirates, United States, Canada, Singapore, Cuba, Eritrea, Myanmar, Iran, North Korea, Kyrgyzstan, Syria, Liberia, Yemen, Somalia, Jamaica, Albania, Barbados, Cambodia or Panama.</p></details>
+      <details><summary>How do I deposit?</summary><p>Visa, Mastercard, bank wire, USDT, Skrill, Neteller and UnionPay. Absel Global charges 0% on deposits.</p></details>
+      <details><summary>Which countries can't open an account?</summary><p>Absel Global does not accept residents of the United Arab Emirates, United States, Canada, Singapore, Cuba, Eritrea, Myanmar, Iran, North Korea, Kyrgyzstan, Syria, Liberia, Yemen, Somalia, Jamaica, Albania, Barbados, Cambodia or Panama.</p></details>
     </div>
   </div>
 </section>
@@ -618,7 +618,7 @@ window.ABSEL_CONFIG = {
     <div><h2>Your account manager is one call away.</h2><p>Leave your number and we'll help you open, verify and fund your account.</p></div>
     <div class="hero-ctas" style="margin-top:0">
       <button class="btn btn-white" data-open-lead>Request a call back</button>
-      <a class="btn btn-line-white" data-cfg-href="registerUrl" href="https://client.abselmarkets.com/register" target="_blank" rel="noopener">Register directly</a>
+      <a class="btn btn-line-white" data-cfg-href="registerUrl" href="/portal/#register">Open account now</a>
     </div>
   </div>
 </section>
@@ -632,10 +632,10 @@ window.ABSEL_CONFIG = {
         <a class="logo" href="#top" aria-label="Absel Global home">
           <img class="logo-img" src="assets/absel-global-logo-white.png" alt="Absel Global" width="133" height="56" style="height:56px">
         </a>
-        <p style="margin-top:18px;max-width:320px">The client registration site of Absel Markets, an FX &amp; CFD broker regulated by the FSC Mauritius.</p>
+        <p style="margin-top:18px;max-width:320px">Absel Global is a trading name of Absel Markets, an FX &amp; CFD broker regulated by the FSC Mauritius.</p>
       </div>
       <div><h4>Contact</h4>
-        <span class="c-label">Email</span><span class="contact-line">support@abselmarkets.com</span>
+        <span class="c-label">Email</span><span class="contact-line">support@abselglobal.com</span>
         <span class="c-label">Phone</span><span class="contact-line">+230 214 4906</span>
         <span class="c-label">WhatsApp</span><span class="contact-line">+44 7576 077989</span>
       </div>
@@ -651,11 +651,11 @@ window.ABSEL_CONFIG = {
       </div>
     </div>
     <div class="legal">
-      <div><h5>Regulatory status</h5><p>Absel Global (abselglobal.com) is operated by Absel Markets for client registration. Absel Markets is authorised and regulated as an Investment Dealer (Full Service Dealer, Excluding Underwriting) by the Financial Services Commission (FSC) of Mauritius under Global Business Licence No. GB25205423, Code FS-4.1 and Code SEC-2.1B. Registered office: Level 6, Ken Lee Building, 20 Edith Cavell Street, Port-Louis 11302, Mauritius.</p></div>
+      <div><h5>Regulatory status</h5><p>Absel Global (abselglobal.com) is a trading name of Absel Markets. Absel Markets is authorised and regulated as an Investment Dealer (Full Service Dealer, Excluding Underwriting) by the Financial Services Commission (FSC) of Mauritius under Global Business Licence No. GB25205423, Code FS-4.1 and Code SEC-2.1B. Registered office: Level 6, Ken Lee Building, 20 Edith Cavell Street, Port-Louis 11302, Mauritius.</p></div>
       <div><h5>Risk warning</h5><p>Trading CFDs and foreign exchange on margin carries a high level of risk and may not be suitable for all investors. Leveraged products can work against you as well as for you. You may lose more than your initial deposit and you are not protected by a government compensation scheme. Make sure you fully understand the risks before trading. Absel Markets operates on an execution-only basis and nothing on this site is investment advice. Past performance is not a reliable indicator of future results.</p></div>
       <div><h5>Restricted jurisdictions</h5><p>Services are not offered to citizens or residents of the United Arab Emirates, United States of America, Canada, Singapore, Cuba, Eritrea, Myanmar, Iran, North Korea, Kyrgyzstan, Syria, Liberia, Yemen, Somalia, Jamaica, Albania, Barbados, Cambodia or Panama, or anywhere such use would be contrary to local law.</p></div>
     </div>
-    <div class="copy"><span>© 2026 Absel Markets. All rights reserved.</span><span>FSC Licence No. GB25205423</span></div>
+    <div class="copy"><span>© 2026 Absel Global. All rights reserved.</span><span>FSC Licence No. GB25205423</span></div>
   </div>
 </footer>
 
@@ -665,7 +665,7 @@ window.ABSEL_CONFIG = {
   <div class="modal-box">
     <button class="modal-x" data-close aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <aside class="modal-side">
-      <span class="eyebrow" style="color:#8FB0FF">Absel Markets</span>
+      <span class="eyebrow" style="color:#8FB0FF">Absel Global</span>
       <h3 id="modalTitle">Open your trading account</h3>
       <p>An account specialist will call you to set everything up.</p>
       <ul>
@@ -682,7 +682,7 @@ window.ABSEL_CONFIG = {
 
 <div class="mbar">
   <button class="btn btn-cta" data-open-lead>Open account</button>
-  <a class="btn btn-line" data-cfg-href="loginUrl" href="https://client.abselmarkets.com" target="_blank" rel="noopener">Log in</a>
+  <a class="btn btn-line" data-cfg-href="loginUrl" href="/portal/">Log in</a>
 </div>
 
 <a class="wa" id="waBtn" href="https://wa.me/447576077989" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp">
@@ -705,12 +705,12 @@ window.ABSEL_CONFIG = {
         <select data-id="interest"><option>ECN account</option><option>STP account</option><option>Islamic (swap-free) account</option><option>Cent account</option><option>Introducing Broker (IB)</option><option>PAMM / MAM</option><option>Social trading</option></select></div>
       <div class="field"><label data-for="exp">Experience</label>
         <select data-id="exp"><option>New to trading</option><option>Under 1 year</option><option>1–3 years</option><option>3+ years</option></select></div>
-      <div class="restricted" hidden>Absel Markets does not accept clients resident in <b class="rname"></b>, so we can't open an account for you.</div>
+      <div class="restricted" hidden>Absel Global does not accept clients resident in <b class="rname"></b>, so we can't open an account for you.</div>
       <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-      <label class="check"><input type="checkbox" data-id="consent"><span>I agree to be contacted by Absel Markets about opening an account and have read the <a href="https://abselmarkets.com/privacyPolicy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+      <label class="check"><input type="checkbox" data-id="consent"><span>I agree to be contacted by Absel Global about opening an account and have read the <a href="https://abselmarkets.com/privacyPolicy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
       <p class="send-err" hidden></p>
       <button class="btn btn-cta" type="submit">Request my call back</button>
-      <p class="risk">CFDs are leveraged and high risk. You may lose more than your deposit. Accounts are opened with Absel Markets, regulated by the FSC Mauritius.</p>
+      <p class="risk">CFDs are leveraged and high risk. You may lose more than your deposit. Absel Global is a trading name of Absel Markets, regulated by the FSC Mauritius.</p>
     </form>
     <div class="trust-row">
       <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>FSC regulated</span>
@@ -721,9 +721,9 @@ window.ABSEL_CONFIG = {
   <div class="done" hidden>
     <div class="tick"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
     <h3>Thanks, <span class="dname"></span>. Your request is in.</h3>
-    <p>An Absel Markets account specialist will contact you within one business day. Want to skip the wait? Start your registration now.</p>
+    <p>An Absel Global account specialist will contact you within one business day. Want to skip the wait? Start your registration now.</p>
     <div class="hero-ctas" style="margin-top:20px">
-      <a class="btn btn-cta reg-link" href="https://client.abselmarkets.com/register" target="_blank" rel="noopener">Register now</a>
+      <a class="btn btn-cta reg-link" href="/portal/#register">Open your account now</a>
       <a class="btn btn-line wa-link" href="https://wa.me/447576077989" target="_blank" rel="noopener">WhatsApp us</a>
     </div>
     <p class="ref"></p>
