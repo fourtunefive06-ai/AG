@@ -1,9 +1,9 @@
 /**
  * Absel Global — website + lead API + Absel CRM
- * Node.js 22.13+ (built-in http and crypto) and PostgreSQL via the `pg` package.
+ * Node.js 22.13+ (built-in http, crypto and node:sqlite). PostgreSQL (DATABASE_URL) uses the "pg" package.
  *
- *   cp .env.example .env    (edit it: DATABASE_URL, SESSION_SECRET, admin login)
- *   npm install && node server.js
+ *   cp .env.example .env    (edit it)
+ *   node server.js
  */
 "use strict";
 const http = require("http");
@@ -15,12 +15,15 @@ const ROOT = __dirname;
 try { process.loadEnvFile(path.join(ROOT, ".env")); } catch { /* optional */ }
 
 const { createCRM, CrmError } = require("./lib/core.js");
-const { openStore } = require("./lib/store-postgres.js");
 const channels = require("./lib/channels.js");
+const b2b = require("./lib/b2binpay.js");
+const cyrafa = require("./lib/cyrafa.js");
 
 /* ------------------------------------------------------------------ config */
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_URL = (process.env.DATABASE_URL || "").trim();
+const DB_SCHEMA = (process.env.DB_SCHEMA || "public").trim();
+const DB_FILE = path.resolve(ROOT, process.env.DB_FILE || "db/crm.db");
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const SESSION_HOURS = Number(process.env.SESSION_HOURS || 12);
 const IS_PROD = process.env.NODE_ENV === "production";
@@ -29,7 +32,6 @@ const CRM_PATH = "/" + (process.env.CRM_PATH || "crm").replace(/^\/+|\/+$/g, "")
 const RESTRICTED = new Set(["United Arab Emirates", "United States", "Canada", "Singapore", "Cuba", "Eritrea", "Myanmar", "Iran", "North Korea", "Kyrgyzstan", "Syria", "Liberia", "Yemen", "Somalia", "Jamaica", "Albania", "Barbados", "Cambodia", "Panama"]);
 
 if (SESSION_SECRET.length < 32) { console.error("✖ Set SESSION_SECRET in .env (at least 32 random characters)."); process.exit(1); }
-if (!DATABASE_URL) { console.error("✖ Set DATABASE_URL in .env to your Postgres connection string (e.g. from Neon: postgresql://user:pass@host/db?sslmode=require)."); process.exit(1); }
 
 /* --------------------------------------------------------------- passwords */
 // PBKDF2-SHA256, 310,000 rounds (OWASP). Same format the browser prototype writes, so accounts move between them.
@@ -52,22 +54,26 @@ function verifyPassword(p, stored) {
 const DUMMY_HASH = hashPassword(crypto.randomBytes(12).toString("hex")); // keeps "unknown user" as slow as "wrong password"
 
 /* ------------------------------------------------------------- CRM + queue */
-const store = openStore(DATABASE_URL, path.join(ROOT, "db", "schema.sql")); // loaded in start() below
+// PostgreSQL when DATABASE_URL is set (loads in the background, see boot() below), otherwise the SQLite file
+const store = DATABASE_URL
+  ? require("./lib/store-postgres.js").openStore(DATABASE_URL, path.join(ROOT, "db", "schema-postgres.sql"), DB_SCHEMA)
+  : require("./lib/store-sqlite.js").openStore(DB_FILE, path.join(ROOT, "db", "schema.sql"));
+let booted = false;
 const sendQueue = [];
 // One-click unsubscribe links in marketing emails: /unsubscribe?t=<lead id>.<signature>
 const unsubToken = id => Buffer.from(id).toString("base64url") + "." + crypto.createHmac("sha256", SESSION_SECRET).update("unsub:" + id).digest("base64url").slice(0, 22);
 const crm = createCRM({ store, hashPassword, verifyPassword, random: n => new Uint8Array(crypto.randomBytes(n)), onQueue: m => sendQueue.push(m.id),
   hashToken: t => crypto.createHash("sha256").update(String(t)).digest("hex"),
   unsubscribeUrl: l => (crm.getSettings().site_url || "") + "/unsubscribe?t=" + unsubToken(l.id) });
-
-function prepare() {
+async function initData() {
+  await store.ready;
   store.transaction(() => crm.ensureDefaults());
+
   // First start: create the admin from .env
   if (!store.all("users").some(u => u.role === "admin")) {
     const u = (process.env.ADMIN_USERNAME || "").trim(), p = process.env.ADMIN_PASSWORD || "";
-    if (!u || p.length < 10) { console.error("✖ First start: set ADMIN_USERNAME and ADMIN_PASSWORD (10+ characters, letters and numbers) in .env to create the admin login."); process.exit(1); }
-    try { store.transaction(() => crm.saveUser(crm.SYSTEM, { name: process.env.ADMIN_NAME || "Administrator", username: u, password: p, role: "admin", email: process.env.ADMIN_EMAIL || "", accepts_leads: false, must_change_password: true })); }
-    catch (e) { console.error("✖ " + e.message); process.exit(1); }
+    if (!u || p.length < 10) throw new Error("First start: set ADMIN_USERNAME and ADMIN_PASSWORD (10+ characters, letters and numbers) in .env to create the admin login.");
+    store.transaction(() => crm.saveUser(crm.SYSTEM, { name: process.env.ADMIN_NAME || "Administrator", username: u, password: p, role: "admin", email: process.env.ADMIN_EMAIL || "", accepts_leads: false, must_change_password: true }));
     console.log(`✔ Admin user "${u}" created. It must choose a new password at first sign-in. Remove ADMIN_PASSWORD from .env now.`);
   }
   // Re-queue anything left unsent by a previous run
@@ -93,10 +99,7 @@ async function drainQueue() {
     }
   } finally { sending = false; }
 }
-function startJobs() {
-  setInterval(() => { try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); dailyMis().catch(e => console.error("MIS email:", e.message)); }, 30000).unref();
-  setTimeout(() => { try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); }, 3000).unref();
-}
+setInterval(() => { if (!booted) return; try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); dailyMis().catch(e => console.error("MIS email:", e.message)); }, 30000).unref();
 
 /* ------------------------------------------------------- daily MIS email */
 async function sendMis(day, to) {
@@ -153,8 +156,8 @@ function send(res, status, body, headers = {}) {
     res.writeHead(status, { ...SEC, "Content-Type": str ? "text/plain; charset=utf-8" : "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
     res.end(str ? body : JSON.stringify(body));
   };
-  // Answer only after this request's changes are saved in Postgres
-  return store.pending() ? store.flush().then(write) : write();
+  // PostgreSQL: answer only after this request's changes are saved
+  return store.pending && store.pending() ? store.flush().then(write) : write();
 }
 function readBody(req, limit = 4 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
@@ -247,6 +250,8 @@ const RPC = {
 };
 // Actions that call out to other systems (async, outside the database transaction)
 const ASYNC_RPC = {
+  // Lists the B2BINPAY wallets so the admin can pick the wallet ID for a payment method
+  async gatewayWallets(u) { if (u.role !== "admin") throw new CrmError("Only admins can see payment gateway wallets.", 403); return b2b.wallets(); },
   async dial(u, leadId) {
     const info = store.transaction(() => crm.dialInfo(u, leadId)), url = env("TELEPHONY_CLICK_URL");
     if (!url) return { mode: "tel", number: info.number };
@@ -272,6 +277,8 @@ function integrations() {
   return {
     lead_api: !!env("LEAD_API_KEY"), meta_leads: !!(env("META_VERIFY_TOKEN") && env("META_PAGE_TOKEN")), google_leads: !!env("GOOGLE_LEAD_KEY"),
     telephony_click: !!env("TELEPHONY_CLICK_URL"), telephony_webhook: !!env("TELEPHONY_WEBHOOK_TOKEN"),
+    b2binpay: b2b.status(), b2binpay_callback: siteUrl() + "/webhooks/payments/b2binpay",
+    cyrafa: cyrafa.status(), cyrafa_callback: siteUrl() + "/webhooks/payments/cyrafa",
   };
 }
 
@@ -325,9 +332,10 @@ async function sendClientLink(kind, to, firstName, token) {
   catch (e) { if (!IS_PROD) { console.log(`  [dev] ${kind} link for ${to}: ${link}`); return link; } console.error("Client email failed:", e.message); return null; }
 }
 const PORTAL_RPC = {
-  me: c => crm.portalMe(c), updateProfile: (c, p) => crm.portalUpdateProfile(c, p), uploadKyc: (c, f) => crm.portalUploadKyc(c, f), getFile: (c, id) => crm.portalGetFile(c, id),
+  me: c => { const m = crm.portalMe(c); if (m.config.methods.some(x => x.gateway === "cyrafa")) { const st = cyrafa.status(); m.config.card = { currency: st.currency, rate: st.rate }; } return m; },
+  gatewayReturn: (c, id, r) => crm.portalGatewayReturn(c, id, r), updateProfile: (c, p) => crm.portalUpdateProfile(c, p), uploadKyc: (c, f) => crm.portalUploadKyc(c, f), getFile: (c, id) => crm.portalGetFile(c, id),
   requestAccount: (c, p) => crm.portalRequestAccount(c, p), revealPassword: (c, id) => crm.portalRevealPassword(c, id),
-  deposit: (c, d) => crm.portalDeposit(c, d), withdraw: (c, d) => crm.portalWithdraw(c, d), transfer: (c, d) => crm.portalTransfer(c, d), cancel: (c, id) => crm.portalCancel(c, id), history: (c, f) => crm.portalHistory(c, f),
+  deposit: (c, d) => crm.portalDeposit(c, d), withdraw: (c, d) => crm.portalWithdraw(c, d), transfer: (c, d) => crm.portalTransfer(c, d), cancel: (c, id) => crm.portalCancel(c, id), track: (c, ev) => crm.portalTrack(c, ev), history: (c, f) => crm.portalHistory(c, f),
   totpBegin: c => crm.portalTotpBegin(c), totpEnable: (c, code) => crm.portalTotpEnable(c, code), totpDisable: (c, code) => crm.portalTotpDisable(c, code),
 };
 const portalErr = (res, e) => { if (e instanceof CrmError) return send(res, e.code === 401 ? 401 : e.code === 404 ? 404 : e.code === 403 ? 403 : 422, { ok: false, error: e.message, fields: e.fields }); throw e; };
@@ -385,12 +393,72 @@ async function portal(req, res, p) {
     if (p === "rpc") {
       const b = await readJson(req, 9 * 1024 * 1024), fn = PORTAL_RPC[b.method];
       if (!fn) return send(res, 404, { ok: false, error: "Unknown action" });
-      const result = store.transaction(() => fn(c, ...(Array.isArray(b.args) ? b.args : []))); drainQueue();
+      let result = store.transaction(() => fn(c, ...(Array.isArray(b.args) ? b.args : []))); drainQueue();
+      if (b.method === "deposit" && result.gateway && result.gateway.status === "creating") result = await startGatewayPayment(result);
       return send(res, 200, { ok: true, result });
     }
     return send(res, 404, { ok: false, error: "Not found" });
   } catch (e) { return portalErr(res, e); }
 }
+
+/* ----------------------------------------------------- payment gateways */
+// The client's deposit request exists first; then we ask the provider for the invoice. If that fails the request is closed.
+async function startGatewayPayment(pay) {
+  try {
+    const rec = store.get("payments", pay.id);
+    if (pay.gateway.provider === "cyrafa") {
+      const x = store.get("clients", rec.client_id), back = siteUrl() + "/portal/#cardresult?p=" + encodeURIComponent(rec.id);
+      const info = await cyrafa.createSession({ paymentId: rec.id, reference: rec.reference, amountUsd: rec.amount, clientId: x.id, name: (x.first_name + " " + x.last_name).trim(), email: x.email,
+        billing: { address1: x.address, city: x.city, country: x.country, postalCode: x.postcode || "" }, successUrl: back + "&r=success", cancelUrl: back + "&r=cancel", notifyUrl: siteUrl() + "/webhooks/payments/cyrafa" });
+      return store.transaction(() => crm.gatewayAttach(pay.id, info));
+    }
+    if (pay.gateway.provider !== "b2binpay") throw new Error("Unknown payment provider");
+    const info = await b2b.createDeposit({ walletId: rec.gateway.wallet, amount: rec.amount, trackingId: pay.id, label: pay.reference, callbackUrl: siteUrl() + "/webhooks/payments/b2binpay", redirectUrl: siteUrl() + "/portal/#history", buttonText: "Back to " + brand() });
+    return store.transaction(() => crm.gatewayAttach(pay.id, info));
+  } catch (e) {
+    console.error("Payment gateway:", e.message);
+    store.transaction(() => crm.gatewayFailed(pay.id, e.message));
+    throw new CrmError(e.notConfigured ? "This payment method isn't switched on yet. Choose another method or contact support." : "The payment service didn't respond. Please try again in a minute or choose another method.");
+  }
+}
+async function applyB2b(ref, info, transfer, txid) {
+  // Trust the provider's API, not only the callback: re-read the deposit when we can
+  let fresh = info; try { fresh = await b2b.getDeposit(info.ext_id); } catch (e) { console.error("B2BINPAY re-read failed:", e.message); }
+  const st = b2b.stateOf(fresh, transfer);
+  return store.transaction(() => crm.gatewayEvent(ref || fresh.tracking_id, { ext_id: fresh.ext_id, state: st.state, note: st.note, amount: Number(fresh.paid) || 0, txid: txid || "", transfer_status: transfer ? transfer.status : null, risk: transfer ? transfer.risk : null }));
+}
+async function b2bCallback(req, res) {
+  if (!hookLimit("b2b:" + clientIp(req))) return send(res, 429, "Too many requests");
+  const raw = await readBody(req, 512 * 1024); let body = null; try { body = JSON.parse(raw.toString("utf8")); } catch (e) { return send(res, 400, "Bad JSON"); }
+  if (!b2b.verifyCallback(body)) { console.error("B2BINPAY callback: bad signature"); return send(res, 401, "Bad signature"); }
+  const cb = b2b.parseCallback(body);
+  try { const r = await applyB2b(cb.info.tracking_id, cb.info, cb.transfer, cb.txid); if (!r.ok) console.error("B2BINPAY callback for unknown payment", cb.info.ext_id); drainQueue(); }
+  catch (e) { console.error("B2BINPAY callback:", e.message); return send(res, 500, ""); } // provider retries
+  res.writeHead(200, SEC); res.end();
+}
+// Cyrafa card payments: one signed notification per payment, sent once (8-second timeout, no retries)
+async function cyrafaWebhook(req, res) {
+  if (!hookLimit("cy:" + clientIp(req))) return send(res, 429, "Too many requests");
+  const raw = await readBody(req, 256 * 1024), v = cyrafa.verifyWebhook(raw, req.headers);
+  if (!v.ok) { console.error("Cyrafa webhook refused:", v.why); return send(res, v.why === "bad signature" ? 401 : 400, { error: v.why }); }
+  let body; try { body = JSON.parse(raw.toString("utf8")); } catch (e) { return send(res, 400, { error: "invalid json" }); }
+  const ev = cyrafa.parseWebhook(body);
+  if (!ev.state) return send(res, 200, "");
+  try {
+    const r = store.transaction(() => crm.gatewayEvent(ev.ref || ev.ext_id, { ext_id: ev.ext_id, state: ev.state, amount: ev.state === "paid" ? cyrafa.toUsd(ev.amount_local) : 0, amount_local: ev.amount_local, amount_after_fees: ev.amount_after_fees, txid: ev.txid, note: ev.note }));
+    if (!r.ok) console.error("Cyrafa webhook for unknown payment", ev.ref, ev.ext_id);
+    drainQueue();
+  } catch (e) { console.error("Cyrafa webhook:", e.message); }
+  res.writeHead(200, SEC); res.end();
+}
+// Safety net for missed callbacks: every 10 minutes re-check open crypto payments
+setInterval(async () => {
+  if (!booted || !b2b.configured()) return;
+  for (const p of crm.gatewayPayments().filter(x => x.provider === "b2binpay").slice(0, 50)) {
+    try { const info = await b2b.getDeposit(p.ext_id); await applyB2b(p.id, info, null, ""); } catch (e) { console.error("B2BINPAY check", p.ext_id, e.message); }
+  }
+  drainQueue();
+}, 10 * 60e3).unref();
 
 /* ---------------------------------------------------------------- routes */
 async function publicLead(req, res) {
@@ -558,6 +626,8 @@ const server = http.createServer(async (req, res) => {
     if (p === "/webhooks/meta-leads") return await metaLeads(req, res, url);
     if (p === "/webhooks/google-leads" && m === "POST") return await googleLeads(req, res);
     if (p === "/webhooks/calls" && m === "POST") return await callWebhook(req, res, url);
+    if (p === "/webhooks/payments/b2binpay" && m === "POST") return await b2bCallback(req, res);
+    if (p === "/webhooks/payments/cyrafa" && m === "POST") return await cyrafaWebhook(req, res);
     if (p === "/unsubscribe" && (m === "GET" || m === "POST")) return await unsubscribe(req, res, url);
     if (p === "/api/crm/login" && m === "POST") return await login(req, res);
     if (p === "/api/crm/password" && m === "POST") return await changePassword(req, res);
@@ -574,27 +644,26 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-async function start() {
-  try { await store.open(); }
-  catch (e) { console.error("✖ Could not open the Postgres database (check DATABASE_URL): " + e.message); process.exit(1); }
-  prepare();
-  startJobs();
+// Load the data first (PostgreSQL loads asynchronously), then accept requests
+initData().then(() => {
+  booted = true;
+  setTimeout(() => { store.transaction(() => crm.tick()); drainQueue(); }, 3000).unref();
   server.listen(PORT, () => {
     const c = channels.status();
     console.log(`✔ Absel Global running on http://localhost:${PORT}`);
     console.log(`  CRM:        http://localhost:${PORT}${CRM_PATH}/`);
     console.log(`  Client area: http://localhost:${PORT}/portal/`);
-    console.log(`  Database:   PostgreSQL ${new URL(DATABASE_URL).host} (${store.all("leads").length} leads, ${store.all("users").length} users)`);
+    console.log(`  Database:   ${store.label || DB_FILE}`);
     console.log(`  Email:      ${c.email.configured ? c.email.provider + " (" + c.email.from + ")" : "not configured — messages are logged as skipped"}`);
     console.log(`  WhatsApp:   ${c.whatsapp.configured ? "Cloud API connected" : "not configured — messages are logged as skipped"}`);
   });
-}
-// Render and PM2 send SIGTERM on deploy/restart: finish saving before exiting
+}).catch(e => { console.error("✖ " + (e.message || e)); process.exit(1); });
+
+// Stop cleanly: finish writing pending changes to the database first
 let stopping = false;
-for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, async () => {
+for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, async () => {
   if (stopping) return; stopping = true;
   server.close();
-  try { await store.close(); } catch (e) { console.error("postgres: " + e.message); }
+  try { if (store.close) await Promise.race([store.close(), new Promise(r => setTimeout(r, 15000))]); } catch (e) { console.error("✖ Database:", e.message); }
   process.exit(0);
 });
-start();

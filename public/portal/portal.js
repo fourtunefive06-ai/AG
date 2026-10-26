@@ -82,7 +82,7 @@
       rd.readAsDataURL(file);
     });
   }
-  const ST = { pending: ["Waiting", "var(--warn)"], first_approved: ["Being approved", "var(--warn)"], approved: ["Approved, sending", "var(--cta)"], completed: ["Done", "var(--up)"], rejected: ["Declined", "var(--down)"], cancelled: ["Cancelled", "var(--muted)"], requested: ["Being opened", "var(--warn)"], open: ["Active", "var(--up)"], closed: ["Closed", "var(--muted)"] };
+  const ST = { paid: ["Received, crediting", "var(--cta)"], pending: ["Waiting", "var(--warn)"], first_approved: ["Being approved", "var(--warn)"], approved: ["Approved, sending", "var(--cta)"], completed: ["Done", "var(--up)"], rejected: ["Declined", "var(--down)"], cancelled: ["Cancelled", "var(--muted)"], requested: ["Being opened", "var(--warn)"], open: ["Active", "var(--up)"], closed: ["Closed", "var(--muted)"] };
   const pill = s => { const [l, c] = ST[s] || [s, "var(--muted)"]; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
   const KYC = { none: ["Not uploaded", "var(--muted)"], pending: ["Under review", "var(--warn)"], approved: ["Verified", "var(--up)"], rejected: ["Not accepted", "var(--down)"], resubmit: ["New documents needed", "var(--down)"] };
   const kycPill = s => { const [l, c] = KYC[s] || KYC.none; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
@@ -303,21 +303,87 @@
     title: "Deposit",
     render(pg, r) {
       const me = S.me, accs = liveAccs(), methods = me.config.methods.filter(m => m.deposit !== false);
+      rpc("track", "deposit_view").catch(() => {}); // counts toward the deposit funnel in the back office
       if (!accs.length) { pg.innerHTML = `<section class="card"><div class="empty"><b>Open a live account first</b>Your deposit goes straight into your MT5 trading account.</div><div class="row" style="justify-content:center"><a class="btn pri" href="#accounts/new">Open live account</a></div></section>`; return; }
       pg.innerHTML = `<form id="f" class="cols" novalidate><section class="card" style="display:grid;gap:18px">
           ${fld("To account", sel("account_id", accs.map(a => [a.id, accLabel(a)]), r.q.a || accs[0].id))}
           <div><h3>Payment method</h3><div class="choices">${methods.map((m, i) => `<label class="choice"><input type="radio" name="method" value="${esc(m.id)}" ${i === 0 ? "checked" : ""}><b>${esc(m.name)}</b><small>${esc(m.eta || "")}</small><span class="mono muted">Min. $${m.min || 0}${m.max ? " · max $" + m.max : ""}</span></label>`).join("")}</div></div>
-          <div class="grid2">${fld("Amount (USD)", inp("amount", "", 'type="number" min="1" step="0.01" inputmode="decimal"'))}${fld("Receipt or screenshot (optional)", '<input class="in" type="file" name="proof" accept="image/*,application/pdf">')}</div>
-          ${fld("Note (optional)", inp("note", "", 'placeholder="e.g. sent from my Equity Bank account"'))}
-          <p class="form-err" hidden></p><button class="btn pri" type="submit">I've paid: notify the team</button>
+          <div class="grid2">${fld("Amount (USD)", inp("amount", "", 'type="number" min="1" step="0.01" inputmode="decimal"'))}<div id="proofBox">${fld("Receipt or screenshot (optional)", '<input class="in" type="file" name="proof" accept="image/*,application/pdf">')}</div></div>
+          <div id="noteBox">${fld("Note (optional)", inp("note", "", 'placeholder="e.g. sent from my Equity Bank account"'))}</div>
+          <div id="billBox" class="grid2" hidden><p class="full muted" style="font-size:13px">Billing address of the card (as on your bank statement)</p>${fld("Address", inp("address1", me.client.address || "", 'autocomplete="address-line1"'), "full")}${fld("City", inp("city", me.client.city || "", 'autocomplete="address-level2"'))}${fld("Postcode (optional)", inp("postcode", me.client.postcode || "", 'autocomplete="postal-code"'))}<p class="full note" id="fxNote" hidden></p></div>
+          <p class="form-err" hidden></p><button class="btn pri" type="submit" id="depBtn">I've paid: notify the team</button>
         </section><aside class="card" style="display:grid;gap:12px"><h3>How to pay</h3><div id="ins"></div><p class="muted" style="font-size:13px">Deposits are free. Pay from an account in your own name; third-party payments are returned. We credit your MT5 account as soon as the payment is confirmed.</p></aside></form>`;
-      const ins = () => { const m = methods.find(x => x.id === ($("input[name=method]:checked") || {}).value) || methods[0]; $("#ins").innerHTML = `<b>${esc(m.name)}</b>${m.instructions ? `<div class="instr" style="margin-top:8px">${esc(m.instructions)}</div>` : ""}${m.link ? `<a class="btn pri block" style="margin-top:10px" href="${esc(m.link)}" target="_blank" rel="noopener">Open secure payment page</a>` : ""}<p class="muted" style="font-size:13px;margin-top:8px">Put your registered email <b>${esc(me.client.email)}</b> in the payment reference so we can match it.</p>`; };
+      const ins = () => { const m = methods.find(x => x.id === ($("input[name=method]:checked") || {}).value) || methods[0];
+        $("#proofBox").hidden = $("#noteBox").hidden = !!m.gateway; $("#billBox").hidden = m.gateway !== "cyrafa"; fx();
+        $("#depBtn").textContent = m.gateway === "cyrafa" ? "Continue to secure card payment" : m.gateway ? "Continue to payment" : "I've paid: notify the team";
+        if (m.gateway === "cyrafa") { $("#ins").innerHTML = `<b>${esc(m.name)}</b><div class="note" style="margin-top:8px">You'll pay on our card partner's secure page with 3-D Secure from your bank. We never see your card number. Your account is credited after the payment is confirmed.</div><p class="muted" style="font-size:13px;margin-top:8px">Use a card in your own name. Payments from other people's cards are refunded.</p>`; return; }
+        if (m.gateway) { $("#ins").innerHTML = `<b>${esc(m.name)}</b><div class="note" style="margin-top:8px">You'll get a payment address and a secure payment page for this deposit. We confirm it automatically when it arrives on the blockchain, usually within minutes. No receipt needed.</div><p class="muted" style="font-size:13px;margin-top:8px">Send exactly the amount shown, on the network shown. Sending another coin or network can lose the funds.</p>`; return; }
+        $("#ins").innerHTML = `<b>${esc(m.name)}</b>${m.instructions ? `<div class="instr" style="margin-top:8px">${esc(m.instructions)}</div>` : ""}${m.link ? `<a class="btn pri block" style="margin-top:10px" href="${esc(m.link)}" target="_blank" rel="noopener">Open secure payment page</a>` : ""}<p class="muted" style="font-size:13px;margin-top:8px">Put your registered email <b>${esc(me.client.email)}</b> in the payment reference so we can match it.</p>`; };
+      const card = me.config.card;
+      function fx() { const n = $("#fxNote"); if (!n) return; const a = Number(($("[name=amount]") || {}).value) || 0; if (!card || card.currency === "USD" || !a) { n.hidden = true; return; } n.hidden = false; n.textContent = `Your card is charged in ${card.currency}: ${card.currency} ${(Math.round(a * card.rate * 100) / 100).toFixed(2)} for $${a.toFixed(2)} (${card.rate} ${card.currency} per $1). Your bank may add its own currency fee.`; }
+      $("[name=amount]").addEventListener("input", fx);
       $$("input[name=method]").forEach(x => x.addEventListener("change", ins)); ins();
       onSubmit($("#f"), async (v, f) => {
         const proof = f.proof.files[0] ? await readFile(f.proof.files[0]) : null;
-        const p = await rpc("deposit", { account_id: v.account_id, method: v.method, amount: v.amount, note: v.note, proof });
+        const p = await rpc("deposit", { account_id: v.account_id, method: v.method, amount: v.amount, note: v.note, proof, billing: { address1: v.address1, city: v.city, postcode: v.postcode } });
+        if (p.gateway && p.gateway.provider === "cyrafa") {
+          if (window.PORTAL_DEMO && window.PORTAL_API && window.PORTAL_API.simulateCard) return demoCheckout(p);
+          if (p.gateway.payment_page) { toast("Opening the secure payment page…"); location.href = p.gateway.payment_page; } return;
+        }
+        if (p.gateway) { await reload(); go("history"); payModal(p); return; }
         await reload(); go("history"); modal("Deposit request sent", `<p>Reference <b class="mono">${esc(p.reference)}</b> · ${money(p.amount)} by ${esc(p.method_name)}.</p><p class="muted">We'll credit your account as soon as the payment arrives and email you when it's done.</p>`);
       });
+    },
+  };
+  // Crypto payment instructions for one deposit: amount, network, address, QR and the provider's payment page
+  // Demo only: stands in for the provider's hosted card page
+  function demoCheckout(p) {
+    const g = p.gateway || {};
+    const m = modal("Secure card payment (demo)", `<p class="muted" style="font-size:13px">On abselglobal.com the client is sent to the card partner's 3-D Secure page here. Nothing is charged in this demo.</p><p><b>${esc(g.currency || "USD")} ${esc(g.target || p.amount)}</b> · ${esc(p.reference)}</p><button class="btn good block" id="cOk" type="button">Approve payment</button><button class="btn block" id="cNo" type="button" style="margin-top:8px">Decline (insufficient funds)</button>`);
+    const go = async ok => { await window.PORTAL_API.simulateCard(p.id, ok); m.close(); location.hash = "#cardresult?p=" + encodeURIComponent(p.id) + "&r=" + (ok ? "success" : "cancel"); };
+    $("#cOk", m.el).addEventListener("click", () => go(true)); $("#cNo", m.el).addEventListener("click", () => go(false));
+  }
+  function payModal(p) {
+    const g = p.gateway || {};
+    if (g.provider === "cyrafa") {
+      if (window.PORTAL_DEMO && window.PORTAL_API && window.PORTAL_API.simulateCard && g.status === "waiting") return demoCheckout(p);
+      const live = g.payment_page && (!g.expires_at || Date.parse(g.expires_at) > Date.now());
+      modal("Card payment", live ? `<p>${esc(p.reference)} · ${money(p.amount)}${g.currency && g.currency !== "USD" ? ` (${esc(g.currency)} ${esc(g.target)})` : ""}</p><a class="btn pri block" href="${esc(g.payment_page)}">Continue to the secure payment page</a>` : `<p class="muted">This payment session has expired. Start a new card deposit.</p><a class="btn pri block" href="#deposit" data-x>New deposit</a>`);
+      return;
+    }
+    if (!g.address && !g.payment_page) { modal("Payment", `<p class="muted">We're preparing the payment details. Refresh in a moment.</p>`); return; }
+    const exp = g.expires_at ? Date.parse(g.expires_at) : 0;
+    const m = modal(`Pay ${money(Number(g.target) || p.amount)} in ${g.currency || "crypto"}`, `<p class="muted" style="font-size:14px">Reference <b class="mono">${esc(p.reference)}</b> · to account ${esc(p.account)}</p>
+      ${g.payment_page ? `<a class="btn pri block" href="${esc(g.payment_page)}" target="_blank" rel="noopener">Open the secure payment page</a><p class="muted" style="font-size:12.5px;text-align:center">or send it yourself:</p>` : ""}
+      ${g.address ? `<div style="display:grid;gap:8px;justify-items:center"><div class="qr" id="payQr"></div>
+        <div class="fld" style="width:100%"><span>Send exactly</span><div class="pw" style="font-size:18px">${esc(g.target || p.amount)} ${esc(g.currency || "")}</div></div>
+        <div class="fld" style="width:100%"><span>To this ${esc(g.network || "")} address</span><div class="pw" style="font-size:13px;word-break:break-all" id="payAddr">${esc(g.address)}</div></div>
+        <button class="btn sm" id="copyAddr" type="button">Copy address</button></div>` : ""}
+      ${exp ? `<p class="note" id="payLeft"></p>` : ""}
+      <p class="muted" style="font-size:13px">We confirm the payment automatically and email you when it's credited. Only send ${esc(g.currency || "the coin shown")} on the network shown.</p>
+      ${window.PORTAL_DEMO && window.PORTAL_API && window.PORTAL_API.simulatePaid ? '<button class="btn good block" id="simPay" type="button">Demo: simulate the payment arriving</button>' : ""}`);
+    const sp = $("#simPay", m.el); if (sp) sp.addEventListener("click", async () => { await window.PORTAL_API.simulatePaid(p.id); m.close(); toast("Payment received. Operations credits MT5 next"); await reload(); });
+    if (g.address) loadQr().then(ok => { const el = $("#payQr", m.el); if (ok && el) new window.QRCode(el, { text: g.address, width: 160, height: 160 }); else if (el) el.hidden = true; });
+    const cp = $("#copyAddr", m.el); if (cp) cp.addEventListener("click", () => { try { navigator.clipboard.writeText(g.address).then(() => toast("Address copied")); } catch (e) { toast("Copy the address by hand"); } });
+    if (exp) { const tick = () => { const el = $("#payLeft", m.el); if (!el) return; const left = exp - Date.now(); el.textContent = left > 0 ? `This payment address is reserved for ${Math.floor(left / 60000)} min ${Math.floor(left / 1000) % 60} s.` : "Time is up. If you haven't paid, close this and start a new deposit."; if (left > 0) setTimeout(tick, 1000); }; tick(); }
+  }
+  // Back from the card payment page. The redirect is only a hint; the provider's notification confirms the payment.
+  VIEWS.cardresult = {
+    title: "Card payment",
+    async render(pg, r) {
+      const id = r.q.p, ok = r.q.r === "success";
+      if (id) { try { await rpc("gatewayReturn", id, ok ? "success" : "cancel"); } catch (e) {} }
+      pg.innerHTML = `<section class="card" style="max-width:560px"><div id="cr" class="empty"><b>${ok ? "Checking your payment…" : "Payment not completed"}</b>${ok ? "This usually takes a few seconds." : "Your card wasn't charged. You can try again or choose another method."}</div><div class="row" style="justify-content:center"><a class="btn" href="#history">Transactions</a>${ok ? "" : '<a class="btn pri" href="#deposit">Try again</a>'}</div></section>`;
+      if (!ok || !id) return;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(res => setTimeout(res, 3000));
+        if (parse().path !== "cardresult" || !$("#cr")) return;
+        let p; try { p = (await rpc("history", { type: "deposit" })).find(x => x.id === id); } catch (e) { continue; }
+        if (!p) return;
+        if (["paid", "completed"].includes(p.status)) { $("#cr").innerHTML = `<b style="color:var(--up)">Payment received</b>${money(Number(p.gateway && p.gateway.paid) || p.amount)} is being credited to account ${esc(p.account)}. We'll email you when it's done.`; S.me = null; return; }
+        if (p.status === "cancelled") { $("#cr").innerHTML = `<b>Payment not completed</b>${esc(p.reject_reason || "")}`; return; }
+      }
+      $("#cr").innerHTML = "<b>Still confirming</b>Your bank's confirmation hasn't reached us yet. We'll update your transactions as soon as it does; there's no need to pay again.";
     },
   };
   VIEWS.withdraw = {
@@ -354,10 +420,11 @@
       const type = r.q.type || "", rows = await rpc("history", { type });
       pg.innerHTML = `<div class="seg">${[["", "All"], ["deposit", "Deposits"], ["withdrawal", "Withdrawals"], ["transfer", "Transfers"]].map(([k, l]) => `<button data-t="${k}" class="${type === k ? "on" : ""}">${l}</button>`).join("")}</div>
         <section class="card" style="padding:0"><div class="scroll"><table class="t"><thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Method</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
-        ${rows.map(p => `<tr><td>${fDT(p.created_at)}<small class="mono">${esc(p.reference)}</small></td><td>${TYPE[p.type]}</td><td class="mono">${esc(p.account)}${p.to_account ? " → " + esc(p.to_account) : ""}</td><td>${esc(p.method_name || "—")}</td><td class="amt ${p.type === "deposit" ? "pos" : ""}">${money(p.amount)}${p.amount_requested && p.amount_requested !== p.amount ? `<small>requested ${money(p.amount_requested)}</small>` : ""}</td><td>${pill(p.status)}${p.status === "rejected" ? `<small>${esc(p.reject_reason)}</small>` : p.status === "completed" && p.completed_at ? `<small>${fDT(p.completed_at)}</small>` : ""}</td><td>${p.status === "pending" ? `<button class="btn sm" data-cancel="${esc(p.id)}">Cancel</button>` : ""}</td></tr>`).join("")}
+        ${rows.map(p => `<tr><td>${fDT(p.created_at)}<small class="mono">${esc(p.reference)}</small></td><td>${TYPE[p.type]}</td><td class="mono">${esc(p.account)}${p.to_account ? " → " + esc(p.to_account) : ""}</td><td>${esc(p.method_name || "—")}</td><td class="amt ${p.type === "deposit" ? "pos" : ""}">${money(p.amount)}${p.amount_requested && p.amount_requested !== p.amount ? `<small>requested ${money(p.amount_requested)}</small>` : ""}</td><td>${pill(p.status)}${p.status === "rejected" ? `<small>${esc(p.reject_reason)}</small>` : p.status === "completed" && p.completed_at ? `<small>${fDT(p.completed_at)}</small>` : ""}</td><td style="white-space:nowrap">${p.gateway && p.status === "pending" && ["waiting", "partial"].includes(p.gateway.status) ? `<button class="btn sm pri" data-pay="${esc(p.id)}">Pay</button> ` : ""}${p.status === "pending" && !(p.gateway && Number(p.gateway.paid) > 0) ? `<button class="btn sm" data-cancel="${esc(p.id)}">Cancel</button>` : ""}</td></tr>`).join("")}
         </tbody></table></div>${rows.length ? "" : '<div class="empty"><b>No transactions</b></div>'}</section>`;
       $$("[data-t]").forEach(b => b.addEventListener("click", () => go("history" + (b.dataset.t ? "?type=" + b.dataset.t : ""))));
       $$("[data-cancel]").forEach(b => b.addEventListener("click", async () => { try { await rpc("cancel", b.dataset.cancel); toast("Cancelled"); await reload(); } catch (e) { toast(e.message); } }));
+      $$("[data-pay]").forEach(b => b.addEventListener("click", () => payModal(rows.find(x => x.id === b.dataset.pay))));
     },
   };
   VIEWS.documents = {

@@ -2,7 +2,6 @@
  * Simulates a 30-day call-centre month against the CRM core.
  *   node tools/simulate.js            → runs checks + prints report summaries
  *   node tools/simulate.js --dump DIR → also writes every collection as JSON (used for demo data)
- *   node tools/simulate.js --demo     → loads the month into DATABASE_URL (must be an empty Postgres database)
  */
 "use strict";
 const path = require("path"), fs = require("fs"), assert = require("assert");
@@ -419,6 +418,23 @@ const seg = crm.previewSegment(MKT, { journey: "bonus_expired" }, "whatsapp"); a
   crm.mergeLeads(MGR, dupe.id, [nl3.id]); assert.strictEqual(store.get("clients", r3.client.id).lead_id, dupe.id, "client moved to the kept lead"); assert.strictEqual(store.get("leads", dupe.id).client_id, r3.client.id);
   const legacy = store.all("leads").find(l => l.stage === "funded" && !l.client_id && l.account_id);
   if (legacy) { const ri = crm.importBalances(OPS, [{ login: legacy.account_id, balance: 500, equity: 520 }]); assert(ri.leads === 1 && crm.getLead(MGR, legacy.id).lifecycle.id === "trading", "sales-opened accounts matched by login"); }
+  // crypto gateway states (the server maps B2BINPAY callbacks to these)
+  { const s0 = crm.getSettings(); crm.saveSettings(ADMIN, { portal: { methods: s0.portal.methods.map(m => m.id === "usdt" ? Object.assign({}, m, { gateway: "b2binpay", gateway_wallet: "11" }) : m) } });
+    const C3 = { id: r3.client.id }, acc3 = store.all("accounts").find(a => a.client_id === C3.id && a.kind === "live");
+    const g1 = crm.portalDeposit(C3, { account_id: acc3.id, method: "usdt", amount: 200 }); assert.strictEqual(g1.gateway.status, "creating");
+    assert(!crm.listPayments(OPS, { type: "deposit", status: "open" }).find(p => p.id === g1.id).gateway.paid, "nothing paid yet");
+    crm.gatewayAttach(g1.id, { ext_id: "900", address: "TXabc", network: "trc20", currency: "USDT", payment_page: "https://pay-sandbox.com/x", expires_at: new Date(T + 3600e3).toISOString(), target: 200 });
+    crm.gatewayEvent(g1.id, { ext_id: "900", state: "partial", amount: 120, txid: "t1" }); let gp = store.get("payments", g1.id);
+    assert(gp.status === "pending" && /Only 120/.test(gp.gateway.review), "partial payment flagged");
+    assert.throws(() => crm.portalCancel(C3, g1.id), /already being processed/, "can't cancel once money arrived");
+    crm.gatewayEvent(g1.id, { ext_id: "900", state: "paid", amount: 200, txid: "t2" }); gp = store.get("payments", g1.id); assert.strictEqual(gp.status, "paid");
+    assert.strictEqual(crm.gatewayEvent(g1.id, { ext_id: "900", state: "paid", amount: 200, txid: "t2" }).duplicate, true, "duplicate callback ignored");
+    crm.decidePayment(OPS, g1.id, "complete", {}); gp = store.get("payments", g1.id); assert(gp.status === "completed" && gp.amount === 200 && gp.ext_reference === "t2");
+    const g2 = crm.portalDeposit(C3, { account_id: acc3.id, method: "usdt", amount: 90 }); crm.gatewayAttach(g2.id, { ext_id: "901", address: "TXdef", expires_at: new Date(T - 7200e3).toISOString(), target: 90 });
+    crm.tick(); assert.strictEqual(store.get("payments", g2.id).status, "cancelled", "unpaid invoice closed after its window");
+    crm.gatewayEvent("901", { ext_id: "901", state: "review", amount: 90, note: "late payment" }); assert.strictEqual(store.get("payments", g2.id).status, "pending", "late payment reopens for a decision");
+    const g3 = crm.portalDeposit(C3, { account_id: acc3.id, method: "usdt", amount: 60 }); crm.gatewayFailed(g3.id, "timeout"); assert.strictEqual(store.get("payments", g3.id).status, "cancelled");
+    crm.saveSettings(ADMIN, { portal: { methods: s0.portal.methods } }); }
   const br = crm.report(MGR, "business", { from: "2026-09-01", to: "2027-12-31" }); assert(br.kpi.registrations >= 3 && br.steps.length === 10 && br.book.length === 11 && br.queues && br.base.live_accounts > 0);
   assert.throws(() => crm.report(U.daniel, "business", {}), /access/i);
 }
@@ -453,6 +469,50 @@ console.log("✔ all checks passed");
   });
 }
 
+/* ---------- payment history for the Payment performance report: card, crypto and manual attempts over the last weeks ---------- */
+{
+  const arr = v => (Array.isArray(v) ? v : v == null ? [] : [v]), OPS = U.fatima, s0 = crm.getSettings(), back = (iso, ms) => iso ? new Date(Date.parse(iso) - ms).toISOString() : iso;
+  crm.saveSettings(ADMIN, { portal: { methods: s0.portal.methods.map(m => m.id === "usdt" ? Object.assign({}, m, { gateway: "b2binpay", gateway_wallet: "11" }) : m.id === "card" ? Object.assign({}, m, { gateway: "cyrafa" }) : m) } });
+  const accs = store.all("accounts").filter(a => a.kind === "live" && a.status === "open" && a.client_id);
+  const DECLINE = ["Insufficient funds", "Do not honour", "3-D Secure authentication failed", "Card not enabled for online payments", "Insufficient funds"];
+  let n = 0;
+  for (let k = 0; k < 64; k++) {
+    const a = accs[k % accs.length], x = store.get("clients", a.client_id), C = { id: x.id }, stuck = k % accs.length >= accs.length - 2, r = stuck ? 70 : (k * 37) % 100, daysAgo = 1 + (k * 7) % 20;
+    if (!x.address) { x.address = "12 Market Street"; x.city = "Dubai"; store.put("clients", x); }
+    const m = stuck || k % 5 < 3 ? "card" : k % 5 === 3 ? "usdt" : "bank", amt = [100, 250, 500, 150, 1000, 300][k % 6];
+    let p;
+    try { p = crm.portalDeposit(C, { account_id: a.id, method: m, amount: amt, billing: { address1: x.address, city: x.city } }); } catch (e) { continue; }
+    n++;
+    if (m === "card") {
+      crm.gatewayAttach(p.id, { ext_id: "cs" + k, payment_page: "https://checkout.cyrafa.com/s/cs" + k, expires_at: new Date(T + 900e3).toISOString(), currency: "AED", target: (amt * 3.6725).toFixed(2), rate: 3.6725 });
+      if (r < 58) { crm.gatewayEvent(p.id, { ext_id: "cs" + k, state: "paid", amount: amt, amount_local: amt * 3.6725, amount_after_fees: amt * 3.6725 * 0.965, txid: "TX" + (500000 + k) }); if (r < 52) crm.decidePayment(OPS, p.id, "complete", {}); }
+      else if (r < 82) crm.gatewayEvent(p.id, { ext_id: "cs" + k, state: "failed", note: DECLINE[k % DECLINE.length] });
+      else { const q = store.get("payments", p.id); q.gateway.returned = r < 92 ? "cancel" : undefined; Object.assign(q, { status: "cancelled", reject_reason: "The card payment wasn't completed.", completed_at: new Date(T + 1800e3).toISOString() }); q.gateway.status = "expired"; store.put("payments", q); }
+    } else if (m === "usdt") {
+      crm.gatewayAttach(p.id, { ext_id: "bz" + k, address: "TQdemo" + k, network: "trc20", currency: "USDT", expires_at: new Date(T + 3600e3).toISOString(), target: amt });
+      if (r < 70) { crm.gatewayEvent(p.id, { ext_id: "bz" + k, state: "paid", amount: amt, txid: "0x" + (k * 991).toString(16) }); crm.decidePayment(OPS, p.id, "complete", {}); }
+      else crm.gatewayEvent(p.id, { ext_id: "bz" + k, state: "expired" });
+    } else { if (r < 80) crm.decidePayment(OPS, p.id, "complete", { reference: "AM-" + (770000 + k) }); else if (r < 90) crm.portalCancel(C, p.id); }
+    // spread over the last weeks: the client paid within minutes, operations credited within hours
+    const q = store.get("payments", p.id), dt = daysAgo * 864e5, credit = (0.5 + (k % 7)) * 36e5;
+    q.created_at = back(q.created_at, dt);
+    if (q.gateway) { arr(q.gateway.events).forEach((e, i) => { e.at = new Date(Date.parse(q.created_at) + (3 + (k % 9) * 2 + i) * 60e3).toISOString(); }); if (q.gateway.created_at) q.gateway.created_at = q.created_at; }
+    if (q.completed_at) q.completed_at = new Date(Date.parse(q.created_at) + (q.status === "completed" ? credit : 20 * 60e3)).toISOString();
+    store.put("payments", q);
+    x.deposit_views = arr(x.deposit_views).concat([q.created_at]).sort(); store.put("clients", x);
+  }
+  // clients who opened the deposit page without starting a deposit
+  store.all("clients").filter(x => (x.kyc || {}).status === "approved").slice(0, 14).forEach((x, i) => { x.deposit_views = arr(x.deposit_views).concat([new Date(T - (1 + i) * 864e5).toISOString()]).sort(); store.put("clients", x); });
+  crm.saveSettings(ADMIN, { portal: { methods: s0.portal.methods } });
+  const pr = crm.report(ADMIN, "payments", { from: new Date(T - 30 * 864e5).toISOString().slice(0, 10), to: new Date(T + 864e5).toISOString().slice(0, 10) });
+  assert(pr.total.attempts >= n && pr.by_method.length >= 3 && pr.total.success_rate > 0 && pr.total.success_rate < 100, "payment report rates");
+  const card = pr.by_method.find(x => x.id === "card"); assert(card && card.by.declined > 0 && card.providers.includes("cyrafa") && card.median_pay_min != null, "card stats");
+  assert(pr.funnel[0].n >= pr.funnel[1].n && pr.funnel[1].n >= pr.funnel[2].n && pr.funnel[2].n >= pr.funnel[3].n, "payment funnel never goes up");
+  assert(pr.reasons.some(x => /Declined: Insufficient funds/.test(x.reason)) && pr.recovery.failed_clients > 0, "failure reasons and recovery");
+  assert.throws(() => crm.report(U.daniel, "payments", {}), /access|managers/i);
+  console.log("Payments:", { attempts: pr.total.attempts, success: pr.total.success_rate + "%", card: card.success_rate + "%", recovered: pr.recovery.recovered + "/" + pr.recovery.failed_clients });
+}
+
 /* ---------- export: shift dates so the month ends "now", then dump or load ---------- */
 function shiftDates(obj, delta) {
   if (Array.isArray(obj)) return obj.map(x => shiftDates(x, delta));
@@ -462,26 +522,21 @@ function shiftDates(obj, delta) {
 }
 const COLS = require("../lib/core.js").COLLECTIONS;
 const arg = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
-// --demo loads into DATABASE_URL from .env; --db <postgres url> loads into another database
-if (process.argv.includes("--demo")) { try { process.loadEnvFile(path.join(__dirname, "..", ".env")); } catch {} }
-const demoDb = arg("--db") || (process.argv.includes("--demo") && process.env.DATABASE_URL) || null;
-if (process.argv.includes("--demo") && !demoDb) { console.error("✖ Set DATABASE_URL in .env (a separate, empty Postgres database for the demo)."); process.exit(1); }
-if (arg("--dump") || demoDb) {
+if (arg("--dump") || arg("--db")) {
   leads.forEach(l => delete l.quality);
   const delta = process.argv.includes("--shift-to-now") ? Date.now() - T : 0;
   const data = Object.fromEntries(COLS.map(c => [c, shiftDates(JSON.parse(JSON.stringify(store.all(c))), delta)]));
   data.users.forEach(u => { delete u.password_hash; u.sample = true; });
   if (arg("--dump")) { const dir = arg("--dump"); fs.mkdirSync(dir, { recursive: true }); for (const c of COLS) fs.writeFileSync(path.join(dir, c + ".json"), JSON.stringify(data[c])); console.log("dumped to", dir); }
-  if (demoDb) (async () => {
+  if (arg("--db")) {
     // Demo database for trying the CRM: every sample user signs in with the password below.
-    const { openStore } = require("../lib/store-postgres.js");
+    const { openStore } = require("../lib/store-sqlite.js");
     const crypto = require("crypto");
     const hash = p => { const salt = crypto.randomBytes(16); return `pbkdf2$sha256$310000$${salt.toString("base64")}$${crypto.pbkdf2Sync(p, salt, 310000, 32, "sha256").toString("base64")}`; };
-    const pw = arg("--password") || "demo-pass-123", h = hash(pw);
-    const db = await openStore(demoDb, path.join(__dirname, "..", "db", "schema.sql")).open();
-    if (db.all("leads").length) { console.error("✖ That database already has leads. Use a new, empty database."); process.exit(1); }
-    db.transaction(() => { for (const c of COLS) for (const o of data[c]) { if (c === "users") { o.password_hash = h; o.must_change_password = false; } db.put(c, o); } });
-    await db.close();
-    console.log(`✔ Demo data written to ${new URL(demoDb).host}. Sign in as admin, sara (sales manager), daniel / grace / chinedu / rahul / yousef / mai (agents), nadia (marketing manager), omar (marketing), fatima / ali (operations) or joy (compliance) with password: ${pw}`);
-  })().catch(e => { console.error("✖ " + e.message); process.exit(1); });
+    const pw = arg("--password") || "demo-pass-123", h = hash(pw), hc = hash("Client-pass-2026");
+    const db = openStore(path.resolve(arg("--db")), path.join(__dirname, "..", "db", "schema.sql"));
+    if (db.all("leads").length) { console.error("✖ That database already has leads. Use a new file."); process.exit(1); }
+    db.transaction(() => { for (const c of COLS) for (const o of data[c]) { if (c === "users") { o.password_hash = h; o.must_change_password = false; } if (c === "clients") o.password_hash = hc; db.put(c, o); } });
+    console.log(`✔ Demo database written to ${arg("--db")}. Sign in as admin, sara (sales manager), daniel / grace / chinedu / rahul / yousef / mai (agents), nadia (marketing manager), omar (marketing), fatima / ali (operations) or joy (compliance) with password: ${pw}`);
+  }
 }

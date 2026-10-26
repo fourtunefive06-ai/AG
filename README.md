@@ -6,7 +6,7 @@ Website, client area and CRM for **Absel Global**, a trading name of Absel Marke
 * **Client area** (`public/portal/`, at `/portal/`): clients register, confirm their email, upload KYC documents, request live and demo MT5 accounts, deposit, withdraw, transfer between accounts and see their history. Two-step login, password reset, account lockout.
 * **Client app:** the client area is a Progressive Web App. Clients can install it on Android, iPhone (Safari → Share → Add to Home Screen), Windows and Mac; it opens full-screen, starts on their dashboard, loads instantly and shows an offline screen without a connection. Account and money data are never cached on the device. Installing needs the site on HTTPS (as in the go-live steps).
 * **Back office** (`public/crm/`, formerly "the CRM"): served at a secret path you choose (`CRM_PATH`), e.g. `https://abselglobal.com/team-desk/`. It is not indexed by search engines.
-* **Backend** (`server.js` + `lib/`): Node.js built-ins plus one npm package, `pg`. Data is stored in **PostgreSQL** (e.g. a free Neon database), set with `DATABASE_URL`.
+* **Backend** (`server.js` + `lib/`): Node.js built-ins plus one npm package, `pg`. Data lives in PostgreSQL (e.g. Neon) when `DATABASE_URL` is set, otherwise in Node's own SQLite. Run `npm install` once after cloning.
 
 ---
 
@@ -28,6 +28,32 @@ Rules: KYC before a live account (switchable), KYC before any withdrawal, minimu
 **Roles:** *Operations* (all queues, clients, balances), *Compliance* (KYC review only). Sales agents see their own clients' client-area status on the lead page; managers see all.
 
 **What clients see of Absel Markets:** only the legal line ("Absel Global is a trading name of Absel Markets…") in the footer and legal documents. Bank transfer details must name the licensed company's segregated account, and card statements and the MT5 server show whatever names Absel Markets' providers use; ask them for "Absel Global" names where possible. Have compliance approve the legal line, client agreement and privacy policy before go-live.
+
+## Payment performance
+
+*Funding → Payment performance* (managers, operations, marketing manager; a summary card is on the Business overview) shows how well deposits convert, for any date range, agent or source:
+
+- **Deposit funnel by client:** opened the deposit page → started a deposit → money received → credited to MT5.
+- **Per method and per provider:** attempts, success rate (finished attempts that brought money), outcomes (credited, received, in progress, needs a decision, declined, not paid, cancelled, provider error, rejected), how long clients take to pay, how long operations takes to credit, average ticket.
+- **Why deposits fail:** decline reasons from the card provider, expired crypto invoices, abandoned payment pages, provider outages, operations rejections.
+- **Recovery:** clients whose attempt failed and who paid later (and whether they switched method), and clients lost after a failure with the amount.
+- First deposit vs repeat, a daily trend, what is open right now, and manual withdrawal speed (median time to pay, % within 24 h).
+
+Use it to spot a weak card provider or BIN declines, to call clients who failed and haven't paid, and to keep crediting fast. Deposit-page visits are counted from v5.2 on.
+
+## Card deposits with CyrafaPay (Visa / Mastercard)
+
+The client chooses *Visa / Mastercard*, an account, an amount and the card's billing address (saved to their profile for next time). The server creates a Cyrafa checkout session and sends the client to Cyrafa's hosted page, where they pay with 3-D Secure: card numbers never reach our server. Cyrafa charges in AED only, so the USD amount is converted at `CYRAFA_FX_RATE` (3.6725, the dirham peg) and the client sees the AED amount before paying. Cyrafa sends one signed notification to `https://<your site>/webhooks/payments/cyrafa` (HMAC-SHA256 of `timestamp.body` with the partner secret, checked, and refused if older than 5 minutes). A successful payment shows "Paid, credit MT5" with the USD and AED amounts, the amount after fees and the transaction ID; operations credits MT5 and confirms with one click. A failed payment closes the request and tells the client they can try again.
+
+Cyrafa sends each notification once, with no retries and no status API. If the client comes back from a successful payment but the notification never arrives, the request goes to operations for review after the session expires (instead of being cancelled), so check the Cyrafa merchant panel and confirm or reject it by hand.
+
+**Set-up:** 1) put `CYRAFA_PARTNER_ID`, `CYRAFA_MERCHANT_ID` and `CYRAFA_PARTNER_SECRET` in `.env` (QA URL first) and restart; 2) give Cyrafa the webhook URL shown in Client area settings; 3) on the *Visa / Mastercard* payment method choose *CyrafaPay (cards)*; 4) run `node tools/cyrafa-check.js` on the server: it creates one small test checkout and tells you if the IDs are accepted; 5) make a test deposit with a Cyrafa test card. For live, switch `CYRAFA_API_URL` to the production URL and use the live IDs.
+
+## Crypto deposits with B2BINPAY (USDT)
+
+The client chooses USDT, an account and an amount. The server creates a B2BINPAY deposit (invoice) for that request: the client gets a payment page, an address with QR code, the exact amount and a countdown. B2BINPAY calls `https://<your site>/webhooks/payments/b2binpay` when money arrives; the callback signature is checked and the deposit is re-read from the B2BINPAY API before anything changes. The request then shows "Paid, credit MT5" in Deposits & withdrawals with the amount and transaction hash filled in: operations credits MT5 at Absel Markets and confirms with one click (a first deposit becomes the agent's verified FTD). Partly paid, late, overpaid and AML-flagged payments are held for a decision; unpaid invoices close when their time runs out; open payments are re-checked every 10 minutes in case a callback was missed. Withdrawals in USDT stay manual (two-person approval) for now.
+
+**Set-up:** 1) put the B2BINPAY settings in `.env` (see `.env.example`), sandbox first, and restart; 2) in B2BINPAY, register the callback URL shown in Client area settings; 3) in Client area settings click *Find wallet IDs*, and on the USDT payment method choose *B2BINPAY (crypto)* and enter the Merchant wallet ID; 4) make a sandbox deposit. On the first real callback, check the server log: if it says "bad signature", tell your developer (the docs don't spell out the exact key format; the code accepts the common variants).
 
 ## The back office, organised around the brokerage lifecycle
 
@@ -121,10 +147,8 @@ You need **Node.js 22.13 or newer** (`node -v`).
 
 ```bash
 cp .env.example .env
-# set SESSION_SECRET to a long random string, and DATABASE_URL to an EMPTY Postgres database
-# (e.g. a separate "demo" branch in Neon, never your live database)
-npm install
-npm run demo        # loads a simulated month of leads, calls and messages into DATABASE_URL
+# set SESSION_SECRET to a long random string, and set DB_FILE=./db/demo.db
+npm run demo        # builds db/demo.db: a simulated month of leads, calls and messages
 npm start
 ```
 
@@ -136,13 +160,6 @@ Open `http://localhost:3000/team-desk/`.
 
 ## 2. Go live
 
-### On Render with a Neon database
-1. **Neon:** create a project, then **Connect** → copy the connection string (it ends in `?sslmode=require`).
-2. **Render web service:** connect this GitHub repo. Build command `npm install`, start command `npm start`.
-3. **Environment:** `DATABASE_URL` (the Neon string), `SESSION_SECRET`, `NODE_ENV=production`, `TRUST_PROXY=1`, `CRM_PATH`, `PORTAL_SESSION_HOURS`, and on the first deploy `ADMIN_USERNAME` / `ADMIN_PASSWORD` (remove the password after the admin exists). Add the email and WhatsApp keys from `.env.example` when you connect them.
-4. Deploy. Tables and views are created in Neon on first start; nothing is stored on Render's disk, so redeploys never lose data.
-
-### On your own server
 1. **Server.** Use any Linux VPS with 1–2 GB RAM. Install Node.js 22 LTS (`nvm install 22`).
 2. **Upload this folder** to the server, e.g. `/var/www/absel-global`.
 3. **Configure `.env`:**
@@ -150,7 +167,6 @@ Open `http://localhost:3000/team-desk/`.
    cp .env.example .env
    nano .env
    ```
-   * `DATABASE_URL`: your Postgres connection string (Neon, or Postgres on the same server). Then run `npm install`.
    * `SESSION_SECRET`: generate it with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
    * `ADMIN_USERNAME` and `ADMIN_PASSWORD`: creates the first admin on first start. The password needs 10+ characters with letters and numbers. You'll be asked to choose a new one at first sign-in; then remove `ADMIN_PASSWORD` from `.env`.
    * `CRM_PATH`: your secret CRM address, e.g. `team-desk`.
@@ -218,8 +234,12 @@ Once connected:
 
 ## 5. Daily operations
 
-* **Backups:** Neon keeps point-in-time history (restore from the Neon console; the free plan keeps a short window). For your own copies, download **Settings → Full backup** in the CRM, or run `pg_dump "$DATABASE_URL" > crm-$(date +%F).sql` daily.
-* **BI / custom MIS:** `db/schema.sql` creates SQL views such as `v_leads`, `v_calls`, `v_tasks`, `v_messages`, `v_users`, `v_deposits` and `v_clients`. Connect Metabase or Power BI to the Postgres database (use a read-only role), or query it in the Neon SQL editor. View columns are text; cast numbers, e.g. `SUM(deposit_amount::numeric)`.
+* **Backups:** with PostgreSQL (Neon), use Neon's point-in-time restore and branches, or a daily `pg_dump "$DATABASE_URL" > crm-$(date +%F).sql`. With SQLite the entire CRM is one file. Back it up daily:
+  ```bash
+  0 3 * * * sqlite3 /var/www/absel-global/db/crm.db ".backup '/var/backups/crm-$(date +\%F).db'"
+  ```
+* **One server process per database:** the CRM keeps the data in memory, so never run two copies (or PM2 cluster mode) against the same `DATABASE_URL`. To try changes without touching live data, set `DB_SCHEMA=staging` (or use a Neon branch).
+* **BI / custom MIS:** `db/schema-postgres.sql` (PostgreSQL) and `db/schema.sql` (SQLite) create the SQL views `v_leads`, `v_calls`, `v_tasks`, `v_messages`, `v_users`, `v_payments` and more. Point Metabase or Power BI at the database, or query it with `psql` / `sqlite3`.
 * **Ad tracking:** tag campaign links like `https://abselglobal.com/?utm_source=google&utm_medium=cpc&utm_campaign=pk-ecn`. For IB partners use `?ref=IB1023`. Every lead keeps its source, campaign, ad, keyword, Google and Meta click IDs and partner code.
 * **Conversion tracking:** the website fires `generate_lead` (GTM / GA4) and `fbq('track','Lead')` on every lead.
 
@@ -263,14 +283,13 @@ Once connected:
 ### Upgrading an existing installation
 Replace the files and restart. New tables are created automatically, the new automations and templates are added once, and leads already funded get a verified deposit record, so targets and reports stay complete. Version 3.1 adds the demo and $100 automations and templates the same way. Then give people their new roles in Team (marketing staff → Marketing executive or Marketing manager).
 
-### Moving data from the prototype, an older SQLite version, or another server
-1. In the CRM, go to **Settings → Full backup → Download full backup** (admin only). The file contains client data, so keep it safe. (From an older SQLite install you can also use its `db/crm.db` file directly.)
-2. On any computer with Node.js 22.13+, put `DATABASE_URL` in `.env`, then run:
+### Moving data from the prototype (or another server)
+1. In the CRM, go to **Settings → Full backup → Download full backup** (admin only). The file contains client data, so keep it safe.
+2. On the server, stop the app and run:
    ```bash
-   npm install
-   node tools/import-backup.js absel-crm-backup-YYYY-MM-DD.json     # or: node tools/import-backup.js crm.db
+   node tools/import-backup.js absel-crm-backup-YYYY-MM-DD.json
    ```
-   It refuses to write into a database that already has data; add `--replace` to wipe the Postgres data first.
+   Add `--replace` to overwrite an existing database. The old one is kept as `.before-import`.
 3. Start the app. Everyone signs in with their same username and password.
 4. Remove the sample accounts and sample leads (marked SAMPLE) before going live.
 
@@ -279,9 +298,13 @@ Replace the files and restart. New tables are created automatically, the new aut
 ```
 server.js              web server, login, CRM API, WhatsApp webhook, automation worker
 lib/core.js            all CRM business logic (leads, routing, calls, scoring, automations, reports)
-lib/store-postgres.js  PostgreSQL persistence (DATABASE_URL)
+lib/store-postgres.js  PostgreSQL persistence (used when DATABASE_URL is set)
+lib/store-sqlite.js    SQLite persistence
 lib/channels.js        email (SMTP, SendGrid, Brevo, Resend) and WhatsApp Cloud API
-db/schema.sql          reporting views
+lib/b2binpay.js        B2BINPAY API v3: token, deposits (invoices), callbacks
+lib/cyrafa.js          CyrafaPay card checkout sessions and signed webhooks
+db/schema.sql          reporting views (SQLite)
+db/schema-postgres.sql reporting views (PostgreSQL)
 public/index.html      website
 public/portal/         client app (index.html, portal.js, manifest.webmanifest, sw.js service worker)
 public/crm/            CRM app: app.js (shell, roles), views-work.js (queue, calling, leads, lead page), views-sales.js (inbox, pipeline,
@@ -290,10 +313,10 @@ public/crm/            CRM app: app.js (shell, roles), views-work.js (queue, cal
                        views-journey.js (demo and $100 account), views-ops.js (operations: KYC, accounts, client money, clients, balances),
                        views-overview.js (business overview, client journey, trading accounts)
 tools/simulate.js      30-day call-centre simulation: self-test incl. security checks (`npm test`) and demo data (`npm run demo`)
-tools/import-backup.js load a CRM backup (.json) or an old SQLite database (.db) into Postgres
+tools/import-backup.js load a CRM backup into the server database
 ```
 
-**Capacity:** the CRM keeps all records in memory for instant reports, loads them from Postgres at start, and saves every change to Postgres before answering the request (if the database is briefly unreachable, changes are kept and retried). It is comfortable up to about 100,000 leads on a 2 GB server. KYC documents and deposit receipts are stored in the database too, so watch the Neon free plan's 0.5 GB storage limit.
+**Capacity:** the CRM keeps all records in memory for instant reports and writes every change to the database immediately (PostgreSQL: in the background, usually within a second). It is comfortable up to about 100,000 leads on a 2 GB server.
 
 ## 8. Public API
 

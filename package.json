@@ -1,6 +1,6 @@
 {
   "name": "absel-global",
-  "version": "5.0.0",
+  "version": "5.2.0",
   "description": "Absel Global website and Absel CRM (sales calling to verified FTD, marketing campaigns and broadcasts, WhatsApp and email automation)",
   "main": "server.js",
   "private": true,
@@ -8,7 +8,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node tools/simulate.js",
-    "demo": "node tools/simulate.js --demo --shift-to-now",
+    "demo": "node tools/simulate.js --db db/demo.db --shift-to-now",
     "import": "node tools/import-backup.js"
   },
   "engines": {
