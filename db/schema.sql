@@ -6,15 +6,11 @@
 --   deposits (first deposits + verification), files (deposit proofs), dnc (do-not-contact list),
 --   reviews (call quality scorecards), attendance (online time and breaks per person per day),
 --   callevents (phone system events and recordings), campaigns, spend (ad spend per day), broadcasts, bonuses (company-funded accounts),
-<<<<<<< HEAD
 --   clients (client-area accounts), accounts (MT5 accounts), payments (deposits, withdrawals, transfers incl. card/crypto gateway details),
 --   mt5_deals (deals read from the MT5 Web API), mt5_positions (open positions snapshot), mt5_unlinked (MT5 logins not linked to a client),
 --   mt5_state (sync status), mt5_ops (ledger of every MT5 action: request, answer, deal ticket, staff user),
 --   partners (IBs), ib_plans (commission plans), commissions (commission ledger), ib_clicks (referral link clicks, hashed IP)
 -- The same views are created on Postgres (Neon) when DATABASE_URL is set: json_extract is translated to jsonb (lib/pg.js).
-=======
---   clients (client-area accounts), accounts (MT5 accounts), payments (deposits, withdrawals, transfers incl. card/crypto gateway details)
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 --
 -- The views below flatten the JSON into columns so you can query the data directly
 -- or connect a BI tool (Metabase, Power BI, Looker Studio via a connector) for MIS.
@@ -173,13 +169,9 @@ FROM clients;
 DROP VIEW IF EXISTS v_accounts;
 CREATE VIEW v_accounts AS
 SELECT id, json_extract(data,'$.client_id') AS client_id, json_extract(data,'$.kind') AS kind, json_extract(data,'$.type') AS type, json_extract(data,'$.login') AS login,
-<<<<<<< HEAD
   json_extract(data,'$.status') AS status, json_extract(data,'$.balance') AS balance, json_extract(data,'$.balance_at') AS balance_at, json_extract(data,'$.opened_at') AS opened_at,
   json_extract(data,'$.equity') AS equity, json_extract(data,'$.margin_free') AS margin_free, json_extract(data,'$.group') AS mt5_group, json_extract(data,'$.leverage') AS leverage,
   json_extract(data,'$.lots_total') AS lots_total, json_extract(data,'$.last_trade_at') AS last_trade_at, json_extract(data,'$.mt5_seen_at') AS mt5_seen_at
-=======
-  json_extract(data,'$.status') AS status, json_extract(data,'$.balance') AS balance, json_extract(data,'$.balance_at') AS balance_at, json_extract(data,'$.opened_at') AS opened_at
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 FROM accounts;
 DROP VIEW IF EXISTS v_payments;
 CREATE VIEW v_payments AS
@@ -191,7 +183,6 @@ SELECT id, json_extract(data,'$.reference') AS reference, json_extract(data,'$.c
   json_extract(data,'$.gateway.currency') AS gateway_currency, json_extract(data,'$.gateway.paid') AS gateway_paid_usd, json_extract(data,'$.gateway.paid_local') AS gateway_paid_local,
   json_extract(data,'$.gateway.net_local') AS gateway_net_local, json_extract(data,'$.gateway.txid') AS gateway_txid, json_extract(data,'$.gateway.returned') AS gateway_returned
 FROM payments;
-<<<<<<< HEAD
 
 -- MT5 Web API: deals synced from MT5 (action 0 buy, 1 sell, 2 balance; entry 0 in, 1 out, 2 in/out, 3 out-by)
 DROP VIEW IF EXISTS v_mt5_deals;
@@ -235,5 +226,3 @@ SELECT id, json_extract(data,'$.partner_id') AS partner_id, json_extract(data,'$
   json_extract(data,'$.status') AS status, json_extract(data,'$.hold_reason') AS hold_reason, json_extract(data,'$.payout_id') AS payout_id,
   json_extract(data,'$.created_at') AS created_at, json_extract(data,'$.decided_by') AS decided_by
 FROM commissions;
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00

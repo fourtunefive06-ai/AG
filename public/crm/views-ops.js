@@ -6,7 +6,6 @@
   const { esc, $, $$, num, money, fDate, fDT, ago, isAdmin, isSales, toast, modal, confirmBox, field, inp, sel } = C;
   const meta = () => C.state.meta;
   const { isOps, isKyc } = C;
-<<<<<<< HEAD
   const mt5w = () => { const m = meta().mt5 || {}; return m.mode === "api" && !!m.writes_enabled; }; // MT5 actions switched on
   const LEGS = { deposit: "Credited in MT5", withdrawal: "Debited in MT5", transfer_out: "Debited in MT5", transfer_in: "Credited in MT5", ib_payout: "Credited in MT5" };
   // Sends an MT5 action and explains the outcome in plain words
@@ -16,8 +15,6 @@
     if (r.found === false) { toast("Checked: it isn't in MT5. Nothing was credited or debited, so you can try again."); return r; }
     throw new Error(r.unknown ? "MT5 didn't confirm in time. Nothing will be sent again until “Check MT5 again” has looked in MT5." : (r.error || "MT5 refused the operation."));
   }
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   const hrs = h => h == null ? "—" : h < 1 ? Math.round(h * 60) + " min" : h < 48 ? Math.round(h * 10) / 10 + " h" : Math.round(h / 24) + " d";
   const late = (h, lim) => h != null && h > lim ? "c-wait late" : "";
   const KYC = { none: ["Not uploaded", "var(--muted)"], pending: ["To review", "var(--warn)"], approved: ["Approved", "var(--up)"], rejected: ["Rejected", "var(--down)"], resubmit: ["New documents asked", "var(--down)"] };
@@ -25,11 +22,7 @@
   const txUrl = g => !g || !g.txid ? "" : /^T/.test(g.address || "") || /trc|tron/i.test(g.network || "") ? "https://tronscan.org/#/transaction/" + g.txid : /^0x/.test(g.address || "") ? "https://etherscan.io/tx/" + g.txid : "";
   const gwCell = p => { const g = p.gateway; if (!g) return ""; const u = txUrl(g);
     return `<small><span class="c-tag info">${esc(g.provider.toUpperCase())}</span> ${esc({ creating: "starting", waiting: "waiting for payment", partial: "partly paid", paid: "paid", expired: "expired", review: "needs decision", error: "error" }[g.status] || g.status)}${Number(g.paid) > 0 ? " · received " + (g.paid_local ? esc(g.currency) + " " + esc(g.paid_local) + " = $" + esc(g.paid) + (g.net_local ? " (after fees " + esc(g.net_local) + ")" : "") : esc(g.paid) + " " + esc(g.currency || "")) : ""}${g.returned === "success" && !(Number(g.paid) > 0) ? " · client returned from a successful payment" : ""}${g.risk != null ? " · AML risk " + esc(g.risk) + "%" : ""}</small>${g.txid ? `<small class="mono">${u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(g.txid.slice(0, 18))}…</a>` : esc(g.txid.slice(0, 18)) + "…"}</small>` : ""}${g.review ? `<small style="color:var(--warn)">${esc(g.review)}</small>` : ""}${g.error ? `<small style="color:var(--down)">${esc(g.error)}</small>` : ""}`; };
-<<<<<<< HEAD
   const PST = { mt5_sending: ["Sending to MT5", "var(--warn)"], mt5_unknown: ["MT5 result unknown", "var(--down)"], debited: ["Debited in MT5, pay the client", "var(--cta)"], mt5_partial: ["Transfer credit failed", "var(--down)"], paid: ["Paid, credit MT5", "var(--cta)"], pending: ["Waiting", "var(--warn)"], first_approved: ["1 of 2 approvals", "var(--warn)"], approved: ["Approved, to pay", "var(--cta)"], completed: ["Completed", "var(--up)"], rejected: ["Rejected", "var(--down)"], cancelled: ["Cancelled by client", "var(--muted)"], requested: ["To open", "var(--warn)"], open: ["Open", "var(--up)"], closed: ["Closed", "var(--muted)"] };
-=======
-  const PST = { paid: ["Paid, credit MT5", "var(--cta)"], pending: ["Waiting", "var(--warn)"], first_approved: ["1 of 2 approvals", "var(--warn)"], approved: ["Approved, to pay", "var(--cta)"], completed: ["Completed", "var(--up)"], rejected: ["Rejected", "var(--down)"], cancelled: ["Cancelled by client", "var(--muted)"], requested: ["To open", "var(--warn)"], open: ["Open", "var(--up)"], closed: ["Closed", "var(--muted)"] };
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   const pPill = s => { const [l, c] = PST[s] || [s, "var(--muted)"]; return `<span class="c-pill plain" style="--c:${c}">${esc(l)}</span>`; };
   const KIND = id => (meta().kyc_kinds.find(k => k.id === id) || { label: id.replace("_", " ") }).label.split(" (")[0];
   C.openClientFile = async id => {
@@ -64,12 +57,8 @@
           ${kpi("Clients", num(d.clients.total), `${d.clients.today} new today · ${d.clients.verified} verified · ${d.clients.funded} funded`, "", "clients")}
           ${kpi("MT5 accounts", num(d.accounts.live), d.accounts.demo + " demo")}
         </div>
-<<<<<<< HEAD
         ${isOps() && d.mt5 && d.mt5.mode === "api" ? `<div class="c-card c-row"><div><b>MT5 sync</b> ${d.mt5.failing_since ? '<span class="c-pill plain" style="--c:var(--down)">Failing</span>' : '<span class="c-pill plain" style="--c:var(--up)">Running</span>'}<p class="muted" style="font-size:13px">${d.mt5.last_ok_at ? "Balances, trades and open positions read from MT5 " + ago(d.mt5.last_ok_at) + "." : "Not synced yet."}${d.mt5.last_error ? " Last error: " + esc(d.mt5.last_error) : ""}${d.mt5.unlinked ? ` <a href="${C.href("mt5unlinked")}">${num(d.mt5.unlinked)} MT5 accounts to link</a>.` : ""}</p></div><span class="sp"></span><a class="c-btn" href="${C.href("mt5recon")}">MT5 reconciliation</a></div>` : ""}
         ${isOps() && !(d.mt5 && d.mt5.mode === "api") ? `<div class="c-card c-row"><div><b>Balances</b><p class="muted" style="font-size:13px">${d.last_balance_import ? "Last import " + fDT(d.last_balance_import) + " (" + ago(d.last_balance_import) + ")" : "Not imported yet."} Import the daily balance report from Absel Markets so clients see up-to-date balances.</p></div><span class="sp"></span><a class="c-btn pri" href="${C.href("balances")}">Import balances</a></div>` : ""}`;
-=======
-        ${isOps() ? `<div class="c-card c-row"><div><b>Balances</b><p class="muted" style="font-size:13px">${d.last_balance_import ? "Last import " + fDT(d.last_balance_import) + " (" + ago(d.last_balance_import) + ")" : "Not imported yet."} Import the daily balance report from Absel Markets so clients see up-to-date balances.</p></div><span class="sp"></span><a class="c-btn pri" href="${C.href("balances")}">Import balances</a></div>` : ""}`;
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     },
     refresh(page, r, alive) { return this.render(page, r, alive); },
   };
@@ -108,14 +97,9 @@
         ${rows.map(a => `<tr><td>${fDT(a.created_at)}</td><td>${a.client ? `<a href="${C.href("client/" + a.client.id)}"><b>${esc(a.client.name)}</b></a><small>${esc(a.client.email)} · ${esc(a.client.country)}</small>` : "—"}</td><td>${kycPill(a.client && a.client.kyc)}</td>
           <td><b>${esc(a.type_name)}</b> <span class="c-tag ${a.kind === "live" ? "info" : ""}">${a.kind.toUpperCase()}</span><small>1:${esc(a.leverage)} · ${esc(a.currency)}${a.kind === "demo" ? " · $" + num(a.balance) + " practice" : ""}</small></td>
           <td class="mono">${esc(a.login || "—")}<small>${esc(a.server || "")}${a.group ? " · " + esc(a.group) : ""}</small></td>
-<<<<<<< HEAD
           <td>${st === "requested" ? `<span class="${late(a.waiting_h, 8)}">${hrs(a.waiting_h)}</span>` : esc(a.opened_by_name)}${a.mt5_created ? "<small>created in MT5</small>" : ""}${a.reject_reason ? `<small>${esc(a.reject_reason)}</small>` : ""}${a.mt5_error ? `<small style="color:var(--down)">${esc(a.mt5_error)}</small>` : ""}</td>
           <td class="r" style="white-space:nowrap">${st === "requested" && isOps() && mt5w() ? (/didn't confirm/.test(a.mt5_error || "") ? `<button class="c-btn sm pri" data-chk="${esc(a.id)}">Check MT5 again</button>` : `<button class="c-btn sm" data-dec="${esc(a.id)}">Decline</button> <button class="c-btn sm ghost" data-open="${esc(a.id)}">Record by hand</button> <button class="c-btn sm pri" data-create="${esc(a.id)}">Approve and create in MT5</button>`)
             : st === "requested" && isOps() ? `<button class="c-btn sm" data-dec="${esc(a.id)}">Decline</button> <button class="c-btn sm pri" data-open="${esc(a.id)}">Record as opened</button>` : st === "open" && isOps() ? `<button class="c-btn sm" data-pw="${esc(a.id)}">New password</button>` : ""}</td></tr>`).join("")}
-=======
-          <td>${st === "requested" ? `<span class="${late(a.waiting_h, 8)}">${hrs(a.waiting_h)}</span>` : esc(a.opened_by_name)}${a.reject_reason ? `<small>${esc(a.reject_reason)}</small>` : ""}</td>
-          <td class="r" style="white-space:nowrap">${st === "requested" && isOps() ? `<button class="c-btn sm" data-dec="${esc(a.id)}">Decline</button> <button class="c-btn sm pri" data-open="${esc(a.id)}">Record as opened</button>` : st === "open" && isOps() ? `<button class="c-btn sm" data-pw="${esc(a.id)}">New password</button>` : ""}</td></tr>`).join("")}
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         </tbody></table></div>${rows.length ? "" : '<div class="c-empty"><b>Nothing here</b></div>'}</div>`;
       wireSeg("openacc", "status");
       $("#aQ").addEventListener("input", C.debounce(e => C.go("openacc", { status: st, q: e.target.value.trim() }), 400));
@@ -131,7 +115,6 @@
           onOpen: el => $("#gp", el).addEventListener("click", () => { $("[name=password]", el).value = genPw(); }),
           onSubmit: async v => { await API.call("openAccount", a.id, v); toast("Saved. The client was emailed"); done(); } });
       }));
-<<<<<<< HEAD
       $$("[data-create]").forEach(b => b.addEventListener("click", async () => {
         const a = find(b.dataset.create), t = meta().portal.account_types.find(z => z.id === a.type) || {}, g = a.kind === "demo" ? t.mt5_demo_group : t.mt5_group;
         if (!(await confirmBox("Approve and create in MT5", `Create a ${a.kind} ${a.type_name} account (1:${a.leverage}) for ${a.client ? a.client.name : "the client"} in MT5 group ${g || "(not set)"}? The client sees the login and a one-time password at once and gets the account email.`, "Create in MT5", false))) return;
@@ -139,8 +122,6 @@
         done();
       }));
       $$("[data-chk]").forEach(b => b.addEventListener("click", async () => { try { await runMt5("mt5Check", [b.dataset.chk], r => "Found in MT5: login " + ((r.account || {}).login || "") + ". Set a new password for the client"); } catch (e) { toast(e.message); } done(); }));
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       $$("[data-dec]").forEach(b => b.addEventListener("click", () => modal({ title: "Decline account request", body: field("Reason (the client sees this)", '<textarea class="c-ta" name="reason" rows="3"></textarea>'), submit: "Decline", danger: true, onSubmit: async v => { await API.call("rejectAccount", b.dataset.dec, v.reason); toast("Declined"); done(); } })));
       $$("[data-pw]").forEach(b => b.addEventListener("click", () => modal({ title: "New MT5 password for the client", body: `<p class="muted">Reset the password at Absel Markets first, then enter it here. The client sees it once.</p>${field("New password", inp("password", genPw(), 'class="c-in mono" autocomplete="off"'))}`, submit: "Save", onSubmit: async v => { await API.call("setAccountPassword", b.dataset.pw, v.password); toast("Saved. The client can view it once"); done(); } })));
     },
@@ -153,7 +134,6 @@
     async render(page, r, alive) {
       const type = r.params.type || "deposit", st = r.params.status || "open";
       const rows = await API.call("listPayments", { type: type === "all" ? "" : type, status: st }); if (!alive()) return;
-<<<<<<< HEAD
       const lim = meta().portal.second_approval_over, me = C.state.user.id, w = mt5w();
       const act = p => {
         if (!isOps()) return "";
@@ -178,12 +158,6 @@
           if (p.gateway && p.status === "pending" && !(Number(p.gateway.paid) > 0)) return `${rej} <span class="muted" style="font-size:12px">waiting for the client to pay</span>`;
           return `${rej} ${hand} <button class="c-btn sm good" data-credit="${esc(p.id)}">Approve and credit in MT5</button>`;
         }
-=======
-      const lim = meta().portal.second_approval_over, me = C.state.user.id;
-      const act = p => {
-        if (!isOps() || !["pending", "first_approved", "approved"].includes(p.status)) return "";
-        const rej = `<button class="c-btn sm danger" data-rej="${esc(p.id)}">Reject</button>`;
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         if (p.type === "withdrawal") {
           if (p.status === "approved") return `${rej} <button class="c-btn sm good" data-done="${esc(p.id)}">Mark paid</button>`;
           const mine = (p.approvals || []).some(z => z.by === me);
@@ -192,28 +166,16 @@
         if (p.gateway && p.status === "pending" && !(Number(p.gateway.paid) > 0)) return `${rej} <span class="muted" style="font-size:12px">waiting for the client to pay</span>`;
         return `${rej} <button class="c-btn sm good" data-done="${esc(p.id)}">${p.status === "paid" ? "Credited in MT5" : p.type === "deposit" ? "Confirm received" : "Mark done"}</button>`;
       };
-<<<<<<< HEAD
       page.innerHTML = `<div class="c-row">${seg("money", [["deposit", "Deposits"], ["withdrawal", "Withdrawals"], ["transfer", "Transfers"], ["ib_payout", "IB payouts"], ["all", "All"]], type, {})}<span class="sp"></span><div class="c-seg">${[["open", "To do"], ["completed", "Completed"], ["rejected", "Rejected"], ["cancelled", "Cancelled"]].map(([k, l]) => `<button data-st="${k}" class="${st === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
-=======
-      page.innerHTML = `<div class="c-row">${seg("money", [["deposit", "Deposits"], ["withdrawal", "Withdrawals"], ["transfer", "Transfers"], ["all", "All"]], type, {})}<span class="sp"></span><div class="c-seg">${[["open", "To do"], ["completed", "Completed"], ["rejected", "Rejected"], ["cancelled", "Cancelled"]].map(([k, l]) => `<button data-st="${k}" class="${st === k ? "on" : ""}">${l}</button>`).join("")}</div></div>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         ${type === "withdrawal" && st === "open" ? `<div class="c-banner">Withdrawals over ${money(lim)} need two different people to approve. Check: KYC approved, same name, paid back to the deposit method, enough free margin at Absel Markets, no bonus money included.</div>` : ""}
         <div class="c-tbox"><div class="c-scroll"><table class="c-table" style="min-width:1100px"><thead><tr><th>Requested</th><th>Client</th><th>Type</th><th>Account</th><th>Method / details</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>
         ${rows.map(p => `<tr><td class="mono">${fDT(p.created_at)}<small>${esc(p.reference)}${p.waiting_h != null ? ` · <span class="${late(p.waiting_h, p.type === "deposit" ? 4 : 24)}">${hrs(p.waiting_h)}</span>` : ""}</small></td>
           <td>${p.client ? `<a href="${C.href("client/" + p.client.id)}"><b>${esc(p.client.name)}</b></a><small>${esc(p.client.email)}</small>${p.client.kyc !== "approved" ? `<small>${kycPill(p.client.kyc)}</small>` : ""}` : "—"}</td>
-<<<<<<< HEAD
           <td>${p.type === "ib_payout" ? "partner payout" + (p.ib ? `<small class="mono">${esc(p.ib.code)}</small>` : "") : esc(p.type)}${p.first_deposit ? ' <span class="c-tag info">FIRST</span>' : ""}${p.chargeback ? ' <span class="c-tag">CHARGEBACK</span>' : ""}</td>
           <td class="mono">${esc(p.account)}${p.to_account ? " → " + esc(p.to_account) : ""}${p.balance_at ? `<small>bal ${money(p.balance)} · ${ago(p.balance_at)}</small>` : ""}</td>
           <td>${esc(p.method_name || "—")}${gwCell(p)}${p.payout_details ? `<small class="mono" style="white-space:pre-wrap">${esc(p.payout_details)}</small>` : ""}${p.note ? `<small>${esc(p.note)}</small>` : ""}${p.proof_file_id ? ` <button class="c-btn sm" data-proof="${esc(p.proof_file_id)}">Receipt</button>` : ""}</td>
           <td class="num"><b>${money(p.amount)}</b>${p.amount_requested && p.amount_requested !== p.amount ? `<small>asked ${money(p.amount_requested)}</small>` : ""}${p.needs_two ? "<small>needs 2 approvals</small>" : ""}</td>
           <td>${pPill(p.status)}${(p.mt5_legs || []).map(z => `<small>${esc(LEGS[z.leg] || "MT5")} · deal #${esc(z.ticket || "?")} · by ${esc(z.by_name)}${z.found_existing ? " (found in MT5)" : ""}</small>`).join("")}${p.mt5_error ? `<small style="color:var(--down)">${esc(p.mt5_error)}</small>` : ""}${(p.approvals_named || []).map(z => `<small>✓ ${esc(z.name)}</small>`).join("")}${p.ext_reference ? `<small class="mono">${esc(p.ext_reference)}</small>` : ""}${p.reject_reason ? `<small>${esc(p.reject_reason)}</small>` : ""}${p.completed_by_name ? `<small>${esc(p.completed_by_name)} · ${fDT(p.completed_at)}</small>` : ""}</td>
-=======
-          <td>${esc(p.type)}${p.first_deposit ? ' <span class="c-tag info">FIRST</span>' : ""}</td>
-          <td class="mono">${esc(p.account)}${p.to_account ? " → " + esc(p.to_account) : ""}${p.balance_at ? `<small>bal ${money(p.balance)} · ${ago(p.balance_at)}</small>` : ""}</td>
-          <td>${esc(p.method_name || "—")}${gwCell(p)}${p.payout_details ? `<small class="mono" style="white-space:pre-wrap">${esc(p.payout_details)}</small>` : ""}${p.note ? `<small>${esc(p.note)}</small>` : ""}${p.proof_file_id ? ` <button class="c-btn sm" data-proof="${esc(p.proof_file_id)}">Receipt</button>` : ""}</td>
-          <td class="num"><b>${money(p.amount)}</b>${p.amount_requested && p.amount_requested !== p.amount ? `<small>asked ${money(p.amount_requested)}</small>` : ""}${p.needs_two ? "<small>needs 2 approvals</small>" : ""}</td>
-          <td>${pPill(p.status)}${(p.approvals_named || []).map(z => `<small>✓ ${esc(z.name)}</small>`).join("")}${p.ext_reference ? `<small class="mono">${esc(p.ext_reference)}</small>` : ""}${p.reject_reason ? `<small>${esc(p.reject_reason)}</small>` : ""}${p.completed_by_name ? `<small>${esc(p.completed_by_name)} · ${fDT(p.completed_at)}</small>` : ""}</td>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
           <td class="r" style="white-space:nowrap">${act(p)}</td></tr>`).join("")}
         </tbody></table></div>${rows.length ? "" : `<div class="c-empty"><b>${st === "open" ? "Nothing to do" : "Nothing here"}</b></div>`}
         ${rows.length ? `<div class="c-foot"><span>${rows.length} requests · ${money(rows.reduce((s, p) => s + p.amount, 0))}</span><button class="c-btn sm" id="mCsv">Export CSV</button></div>` : ""}</div>`;
@@ -222,7 +184,6 @@
       const csv = $("#mCsv"); if (csv) csv.addEventListener("click", () => C.downloadCsv("absel-client-money", ["Requested", "Reference", "Client", "Email", "Type", "Account", "To account", "Method", "Amount", "Status", "Bank / back-office ref", "Completed"], rows.map(p => [p.created_at, p.reference, p.client ? p.client.name : "", p.client ? p.client.email : "", p.type, p.account, p.to_account, p.method_name || "", p.amount, p.status, p.ext_reference, p.completed_at || ""])));
       $$("[data-proof]").forEach(b => b.addEventListener("click", () => C.openClientFile(b.dataset.proof)));
       const done = () => C.render(), find = id => rows.find(x => x.id === id);
-<<<<<<< HEAD
       $$("[data-ok]").forEach(b => b.addEventListener("click", async () => { const p = find(b.dataset.ok); if (!(await confirmBox(p.type === "ib_payout" ? "Approve partner payout" : "Approve withdrawal", `Approve ${money(p.amount)} to ${p.client.name} by ${p.method_name}?\n\n${p.payout_details}`, "Approve", false))) return; try { const x = await API.call("decidePayment", p.id, "approve"); toast(x.status === "approved" ? "Approved. Send the payment, then mark it paid" : "Approved once. A colleague must approve too"); done(); } catch (e) { toast(e.message); } }));
       $$("[data-credit]").forEach(b => b.addEventListener("click", () => {
         const p = find(b.dataset.credit), paid = p.gateway && Number(p.gateway.paid) > 0;
@@ -250,14 +211,6 @@ ${p.payout_details || ""}`;
         modal({ title: p.type === "ib_payout" ? "Mark partner payout paid" : p.status === "debited" ? "Mark withdrawal paid" : mt5w() ? "Record by hand (done in MT5 Manager)" : p.type === "deposit" ? "Confirm deposit received" : p.type === "withdrawal" ? "Mark withdrawal paid" : "Mark transfer done", submit: "Save and notify client",
           body: `<p>${esc(p.client.name)} · ${esc(p.reference)} · account <b class="mono">${esc(p.account)}</b>${p.to_account ? " → <b class=\"mono\">" + esc(p.to_account) + "</b>" : ""}</p>
             <p class="muted">${p.type === "ib_payout" ? (p.method === "mt5" ? "Credit the partner's MT5 account in MT5 Manager (comment IB " + esc(p.reference) + "), then enter the deal number." : "Send the payment to the details above, then enter the payment reference.") + " The commission lines in this payout become paid." : p.status === "debited" ? "Already debited in MT5. Send the money to the client (bank or USDT), then enter the payout reference." : p.gateway && Number(p.gateway.paid) > 0 ? `${esc(p.gateway.provider.toUpperCase())} confirmed ${esc(p.gateway.paid)} ${esc(p.gateway.currency || "")} received. Credit MT5 at Absel Markets first.` : p.type === "deposit" ? "Check the money arrived in Absel Markets' account and credit it in MT5 first." : p.type === "withdrawal" ? "Send the payment from Absel Markets and debit MT5 first." : "Move the balance in MT5 first."}${p.first_deposit ? " <b>This is the client's first deposit; it counts as a verified FTD for the sales agent.</b>" : ""}</p>
-=======
-      $$("[data-ok]").forEach(b => b.addEventListener("click", async () => { const p = find(b.dataset.ok); if (!(await confirmBox("Approve withdrawal", `Approve ${money(p.amount)} to ${p.client.name} by ${p.method_name}?\n\n${p.payout_details}`, "Approve", false))) return; try { const x = await API.call("decidePayment", p.id, "approve"); toast(x.status === "approved" ? "Approved. Send the payment, then mark it paid" : "Approved once. A colleague must approve too"); done(); } catch (e) { toast(e.message); } }));
-      $$("[data-done]").forEach(b => b.addEventListener("click", () => {
-        const p = find(b.dataset.done);
-        modal({ title: p.type === "deposit" ? "Confirm deposit received" : p.type === "withdrawal" ? "Mark withdrawal paid" : "Mark transfer done", submit: "Save and notify client",
-          body: `<p>${esc(p.client.name)} · ${esc(p.reference)} · account <b class="mono">${esc(p.account)}</b>${p.to_account ? " → <b class=\"mono\">" + esc(p.to_account) + "</b>" : ""}</p>
-            <p class="muted">${p.gateway && Number(p.gateway.paid) > 0 ? `${esc(p.gateway.provider.toUpperCase())} confirmed ${esc(p.gateway.paid)} ${esc(p.gateway.currency || "")} received. Credit MT5 at Absel Markets first.` : p.type === "deposit" ? "Check the money arrived in Absel Markets' account and credit it in MT5 first." : p.type === "withdrawal" ? "Send the payment from Absel Markets and debit MT5 first." : "Move the balance in MT5 first."}${p.first_deposit ? " <b>This is the client's first deposit; it counts as a verified FTD for the sales agent.</b>" : ""}</p>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
             <div class="c-grid">${field(p.type === "deposit" ? "Amount received (USD)" : "Amount (USD)", inp("amount", p.gateway && Number(p.gateway.paid) > 0 ? p.gateway.paid : p.amount, 'type="number" step="0.01" min="0.01"'))}${p.type !== "transfer" ? field(p.type === "deposit" ? "Bank / PSP / back-office reference" : "Payment reference", inp("reference", p.gateway ? p.gateway.txid || p.gateway.ext_id || "" : "")) : ""}${field("Internal note (optional)", inp("note", ""), "full")}</div>`,
           onSubmit: async v => { await API.call("decidePayment", p.id, "complete", v); toast("Done. The client was emailed"); done(); } });
       }));
@@ -287,35 +240,23 @@ ${p.payout_details || ""}`;
       const d = await API.call("getClient", r.id); if (!alive()) return;
       const x = d.client; C.setTitle(x.name);
       page.innerHTML = `<div class="c-card c-row" style="align-items:flex-start"><div><h2 style="font-size:22px">${esc(x.name)} ${x.status === "blocked" ? '<span class="c-tag">BLOCKED</span>' : ""}</h2><p class="muted">${esc(x.email)} · ${esc(x.dial_code)} ${esc(x.phone)} · ${esc(x.country)} · registered ${fDT(x.created_at)}</p>
-<<<<<<< HEAD
           <p style="margin-top:6px">${kycPill(x.kyc.status)} ${x.email_verified_at ? '<span class="c-pill plain" style="--c:var(--up)">Email confirmed</span>' : '<span class="c-pill plain">Email not confirmed</span>'} ${x.totp_enabled ? '<span class="c-pill plain" style="--c:var(--up)">2-step login on</span>' : ""} ${x.ib ? `<span class="c-pill plain" style="--c:var(--cta)">IB client · ${esc(x.ib.code)}</span>` : ""} ${x.is_partner ? `<span class="c-pill plain" style="--c:var(--cta)">Partner ${esc(x.is_partner)}</span>` : ""}</p></div><span class="sp"></span>
-=======
-          <p style="margin-top:6px">${kycPill(x.kyc.status)} ${x.email_verified_at ? '<span class="c-pill plain" style="--c:var(--up)">Email confirmed</span>' : '<span class="c-pill plain">Email not confirmed</span>'} ${x.totp_enabled ? '<span class="c-pill plain" style="--c:var(--up)">2-step login on</span>' : ""}</p></div><span class="sp"></span>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
           <div class="c-row">${x.lead_id ? `<a class="c-btn" href="${C.href("lead/" + x.lead_id)}">Sales lead ${esc(x.reference)}</a>` : ""}${d.can_ops ? `<button class="c-btn ${x.status === "blocked" ? "" : "danger"}" id="blk">${x.status === "blocked" ? "Unblock" : "Block client area"}</button>` : ""}</div></div>
         <div class="c-cols c2">
           <div class="c-card"><h3>Profile</h3><dl class="c-dl"><dt>Date of birth</dt><dd>${esc(x.dob || "—")}</dd><dt>Nationality</dt><dd>${esc(x.nationality || "—")}</dd><dt>Address</dt><dd>${esc([x.address, x.city, x.postcode].filter(Boolean).join(", ") || "—")}</dd><dt>Sales owner</dt><dd>${esc(x.owner_name || "—")}</dd><dt>Deposited</dt><dd class="mono">${money(x.deposits)}</dd><dt>Referral code</dt><dd class="mono">${esc(x.ref_code)}</dd></dl></div>
           <div class="c-card"><h3>Documents ${kycPill(x.kyc.status)}</h3>${d.docs.length ? d.docs.map(f => `<div class="c-qitem"><div><b>${esc(KIND(f.kind))}</b><small>${esc(f.name)} · ${Math.round(f.size / 1024)} KB · ${fDT(f.created_at)} · ${esc(f.review || "")}</small></div><div class="acts">${d.can_kyc ? `<button class="c-btn sm" data-doc="${esc(f.id)}">Open</button>` : ""}</div></div>`).join("") : '<p class="muted">Nothing uploaded yet.</p>'}${x.kyc.reason ? `<p class="muted" style="font-size:13px;margin-top:8px">Last note: ${esc(x.kyc.reason)}</p>` : ""}${d.can_kyc && x.kyc.status === "pending" ? `<p style="margin-top:10px"><a class="c-btn sm pri" href="${C.href("kyc")}">Review in KYC queue</a></p>` : ""}</div>
         </div>
-<<<<<<< HEAD
         <div class="c-card"><h3>Trading accounts</h3>${d.accounts.length ? `<div class="c-scroll"><table class="c-table" style="min-width:640px"><thead><tr><th>Account</th><th>MT5 login</th><th>Status</th><th class="r">Balance</th><th></th></tr></thead><tbody>${d.accounts.map(a => `<tr><td><b>${esc(a.type_name)}</b> <span class="c-tag ${a.kind === "live" ? "info" : ""}">${a.kind.toUpperCase()}</span><small>1:${esc(a.leverage)} · ${esc(a.currency)}</small></td><td class="mono">${esc(a.login || "—")}<small>${esc(a.server)}</small></td><td>${pPill(a.status)}${a.has_password ? "<small>first password not viewed yet</small>" : ""}</td><td class="num">${a.balance_at || a.kind === "demo" ? money(a.balance) : "—"}${a.balance_at ? `<small>${ago(a.balance_at)}</small>` : ""}${a.margin_free != null ? `<small>free margin ${money(a.margin_free)}${a.positions_open ? " · " + a.positions_open + " open" : ""}</small>` : ""}</td><td class="r">${d.can_ops && a.status === "open" ? `${a.kind === "live" ? `<button class="c-btn sm" data-lev="${esc(a.id)}">Leverage</button> ` : ""}<button class="c-btn sm" data-bal="${esc(a.id)}">Set balance</button> <button class="c-btn sm" data-pw="${esc(a.id)}">New password</button> <button class="c-btn sm" data-close="${esc(a.id)}">Close</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">No accounts.</p>'}</div>
         <div class="c-card"><h3>Money requests</h3>${d.payments.length ? `<div class="c-scroll"><table class="c-table" style="min-width:640px"><thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Method</th><th class="r">Amount</th><th>Status</th></tr></thead><tbody>${d.payments.map(p => `<tr><td>${fDT(p.created_at)}<small class="mono">${esc(p.reference)}</small></td><td>${esc(p.type)}</td><td class="mono">${esc(p.account)}${p.to_account ? " → " + esc(p.to_account) : ""}</td><td>${esc(p.method_name || "—")}</td><td class="num">${money(p.amount)}</td><td>${pPill(p.status)}${p.ext_reference ? `<small class="mono">${esc(p.ext_reference)}</small>` : ""}${p.chargeback ? `<small style="color:var(--down)">Chargeback: ${esc(p.chargeback.reason)}</small>` : d.can_ops && p.type === "deposit" && p.status === "completed" ? ` <button class="c-btn sm ghost" data-cb="${esc(p.id)}">Chargeback</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">None.</p>'}</div>
-=======
-        <div class="c-card"><h3>Trading accounts</h3>${d.accounts.length ? `<table class="c-table"><thead><tr><th>Account</th><th>MT5 login</th><th>Status</th><th class="r">Balance</th><th></th></tr></thead><tbody>${d.accounts.map(a => `<tr><td><b>${esc(a.type_name)}</b> <span class="c-tag ${a.kind === "live" ? "info" : ""}">${a.kind.toUpperCase()}</span><small>1:${esc(a.leverage)} · ${esc(a.currency)}</small></td><td class="mono">${esc(a.login || "—")}<small>${esc(a.server)}</small></td><td>${pPill(a.status)}${a.has_password ? "<small>first password not viewed yet</small>" : ""}</td><td class="num">${a.balance_at || a.kind === "demo" ? money(a.balance) : "—"}${a.balance_at ? `<small>${ago(a.balance_at)}</small>` : ""}</td><td class="r">${d.can_ops && a.status === "open" ? `<button class="c-btn sm" data-bal="${esc(a.id)}">Set balance</button> <button class="c-btn sm" data-pw="${esc(a.id)}">New password</button> <button class="c-btn sm" data-close="${esc(a.id)}">Close</button>` : ""}</td></tr>`).join("")}</tbody></table>` : '<p class="muted">No accounts.</p>'}</div>
-        <div class="c-card"><h3>Money requests</h3>${d.payments.length ? `<table class="c-table"><thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Method</th><th class="r">Amount</th><th>Status</th></tr></thead><tbody>${d.payments.map(p => `<tr><td>${fDT(p.created_at)}<small class="mono">${esc(p.reference)}</small></td><td>${esc(p.type)}</td><td class="mono">${esc(p.account)}${p.to_account ? " → " + esc(p.to_account) : ""}</td><td>${esc(p.method_name || "—")}</td><td class="num">${money(p.amount)}</td><td>${pPill(p.status)}${p.ext_reference ? `<small class="mono">${esc(p.ext_reference)}</small>` : ""}</td></tr>`).join("")}</tbody></table>` : '<p class="muted">None.</p>'}</div>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         ${d.logins.length ? `<div class="c-card"><h3>Sign-in history</h3>${d.logins.slice(0, 10).map(g => `<p style="font-size:13px">${fDT(g.at)} · ${esc(g.outcome.replace("_", " "))} · <span class="mono">${esc(g.ip)}</span></p>`).join("")}</div>` : ""}`;
       $$("[data-doc]").forEach(b => b.addEventListener("click", () => C.openClientFile(b.dataset.doc)));
       const done = () => C.render();
       const blk = $("#blk"); if (blk) blk.addEventListener("click", () => x.status === "blocked" ? API.call("setClientStatus", x.id, "active").then(() => { toast("Unblocked"); done(); }, e => toast(e.message)) : modal({ title: "Block client area", body: field("Reason (internal)", inp("reason", "")), submit: "Block", danger: true, onSubmit: async v => { await API.call("setClientStatus", x.id, "blocked", v.reason); toast("Blocked. The client is signed out"); done(); } }));
       $$("[data-bal]").forEach(b => b.addEventListener("click", () => { const a = d.accounts.find(y => y.id === b.dataset.bal); modal({ title: "Set balance for " + a.login, body: `<div class="c-grid">${field("Balance (USD)", inp("balance", a.balance, 'type="number" step="0.01"'))}${field("Equity (optional)", inp("equity", a.equity == null ? "" : a.equity, 'type="number" step="0.01"'))}</div><p class="muted" style="font-size:12.5px">Copy it from MT5 Manager. For many accounts, use Balance import.</p>`, onSubmit: async v => { const p = { balance: v.balance }; if (v.equity !== "") p.equity = v.equity; await API.call("updateAccount", a.id, p); toast("Updated"); done(); } }); }));
-<<<<<<< HEAD
       $$("[data-cb]").forEach(b => b.addEventListener("click", () => modal({ title: "Record a chargeback", body: `<p class="muted">For a deposit the bank or card scheme reversed. A partner CPA paid on this first deposit is reversed too.</p>${field("Reason", inp("reason", ""))}`, submit: "Record chargeback", danger: true, onSubmit: async v => { await API.call("markChargeback", b.dataset.cb, v.reason); toast("Recorded"); done(); } })));
       $$("[data-lev]").forEach(b => b.addEventListener("click", () => { const a = d.accounts.find(y => y.id === b.dataset.lev), t = meta().portal.account_types.find(z => z.id === a.type) || {};
         modal({ title: "Change leverage on " + a.login, body: `<p class="muted">${mt5w() ? "Changed in MT5 now and logged." : "Change it in MT5 Manager first, then record it here."} Allowed for ${esc(a.type_name)}: ${(t.leverages || []).map(v => "1:" + v).join(", ")}.</p>${field("Leverage", sel("leverage", (t.leverages || []).map(v => [v, "1:" + v]), a.leverage))}`, submit: mt5w() ? "Change in MT5" : "Record",
           onSubmit: async v => { const r = await API.call("mt5Leverage", a.id, Number(v.leverage)); if (r.ok === false) throw new Error(r.error || "MT5 refused the change."); toast("Leverage changed"); done(); } }); }));
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       $$("[data-pw]").forEach(b => b.addEventListener("click", () => modal({ title: "New MT5 password", body: `<p class="muted">Reset it at Absel Markets first. The client sees it once.</p>${field("New password", inp("password", genPw(), 'class="c-in mono" autocomplete="off"'))}`, onSubmit: async v => { await API.call("setAccountPassword", b.dataset.pw, v.password); toast("Saved"); done(); } })));
       $$("[data-close]").forEach(b => b.addEventListener("click", async () => { if (!(await confirmBox("Close account", "Mark this account as closed? Close it at Absel Markets too.", "Close"))) return; try { await API.call("updateAccount", b.dataset.close, { status: "closed" }); toast("Closed"); done(); } catch (e) { toast(e.message); } }));
     },
@@ -333,11 +274,7 @@ ${p.payout_details || ""}`;
   C.views.balances = {
     title: "Trading data import",
     render(page) {
-<<<<<<< HEAD
       page.innerHTML = `${(meta().mt5 || {}).mode === "api" ? '<div class="c-banner" style="max-width:760px">MT5 is connected: balances, trades and open positions are read from MT5 automatically. Use this import only if the MT5 connection is down.</div>' : ""}<div class="c-card" style="display:grid;gap:12px;max-width:760px"><h3>Import the daily trading report from Absel Markets</h3>
-=======
-      page.innerHTML = `<div class="c-card" style="display:grid;gap:12px;max-width:760px"><h3>Import the daily trading report from Absel Markets</h3>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         <p class="muted">Export the accounts report from MT5 Manager or the back-office as CSV. Required columns: <b>Login</b> and <b>Balance</b>. Optional: <b>Equity</b>, <b>Lots</b> (total traded) and <b>Last trade</b> (date). Clients see the dated balances in the client area, withdrawals above the balance are blocked, and trading activity marks clients as active traders (or dormant).</p>
         <input class="c-in" type="file" id="bf" accept=".csv,text/csv,text/plain"><div id="bp"></div></div><div id="br"></div>`;
       $("#bf").addEventListener("change", async e => {
@@ -355,52 +292,31 @@ ${p.payout_details || ""}`;
   C.views.portalsettings = {
     title: "Client area settings",
     async render(page, r, alive) {
-<<<<<<< HEAD
       const [s, m5] = await Promise.all([API.call("getSettings"), API.call("mt5Status").catch(() => null)]); if (!alive()) return;
       const p = s.portal || {}, api = m5 && m5.mode === "api";
       const tRow = (t, i) => `<div class="c-grid g3 c-card" data-t style="padding:12px;gap:8px">${field("Name", inp("name", t.name))}${field("Code", inp("id", t.id))}${field("Min. first deposit ($)", inp("min_deposit", t.min_deposit, 'type="number" min="0"'))}${field("Description", inp("desc", t.desc || ""), "full")}${field("Leverages", inp("leverages", (t.leverages || []).join(", ")))}${field("Currencies", inp("currencies", (t.currencies || []).join(", ")))}${field("MT5 group (live)", inp("mt5_group", t.mt5_group || "", 'placeholder="e.g. real\absel-global\ecn" class="c-in mono"'))}${field("MT5 group (demo)", inp("mt5_demo_group", t.mt5_demo_group || "", 'class="c-in mono"'))}<div class="c-row" style="align-items:end"><button type="button" class="c-btn sm danger" data-del>Remove</button></div></div>`;
-=======
-      const s = await API.call("getSettings"); if (!alive()) return;
-      const p = s.portal || {};
-      const tRow = (t, i) => `<div class="c-grid g3 c-card" data-t style="padding:12px;gap:8px">${field("Name", inp("name", t.name))}${field("Code", inp("id", t.id))}${field("Min. first deposit ($)", inp("min_deposit", t.min_deposit, 'type="number" min="0"'))}${field("Description", inp("desc", t.desc || ""), "full")}${field("Leverages", inp("leverages", (t.leverages || []).join(", ")))}${field("Currencies", inp("currencies", (t.currencies || []).join(", ")))}<div class="c-row" style="align-items:end"><button type="button" class="c-btn sm danger" data-del>Remove</button></div></div>`;
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       const mRow = m => `<div class="c-grid g3 c-card" data-m style="padding:12px;gap:8px">${field("Name", inp("name", m.name))}${field("Code", inp("id", m.id))}${field("Type", sel("kind", [["bank", "Bank"], ["card", "Card"], ["crypto", "Crypto"], ["ewallet", "E-wallet"], ["other", "Other"]], m.kind))}${field("Min ($)", inp("min", m.min, 'type="number" min="0"'))}${field("Max ($, 0 = none)", inp("max", m.max || 0, 'type="number" min="0"'))}${field("Time to arrive", inp("eta", m.eta || ""))}
         ${field("Payment instructions shown to the client (bank details, wallet address…)", `<textarea class="c-ta" name="instructions" rows="4">${esc(m.instructions || "")}</textarea>`, "full")}${field("Secure payment link (https, optional)", inp("link", m.link || "", 'placeholder="https://"'), "full")}
         ${field("Confirmed automatically by", sel("gateway", [["", "Operations (manual)"], ["b2binpay", "B2BINPAY (crypto)"], ["cyrafa", "CyrafaPay (cards)"]], m.gateway || ""))}${field("B2BINPAY wallet ID", inp("gateway_wallet", m.gateway_wallet || "", 'placeholder="from Find wallet IDs"'))}
         <label class="c-switch"><input type="checkbox" name="deposit" ${m.deposit !== false ? "checked" : ""}><span>Deposits</span></label><label class="c-switch"><input type="checkbox" name="withdraw" ${m.withdraw !== false ? "checked" : ""}><span>Withdrawals</span></label><label class="c-switch"><input type="checkbox" name="enabled" ${m.enabled !== false ? "checked" : ""}><span>Shown to clients</span></label><div class="c-row" style="align-items:end"><button type="button" class="c-btn sm danger" data-del>Remove</button></div></div>`;
       const cy = (s.integrations || {}).cyrafa;
       const bz = (s.integrations || {}).b2binpay;
-<<<<<<< HEAD
       page.innerHTML = `${m5 ? C.mt5Card(m5) : ""}${bz ? `<div class="c-card c-row" style="max-width:980px"><div><b>B2BINPAY (crypto payments)</b> ${bz.configured ? `<span class="c-pill plain" style="--c:var(--up)">Connected${bz.sandbox ? " · sandbox" : ""}</span>` : '<span class="c-pill plain">Not set up</span>'}<p class="muted" style="font-size:12.5px;overflow-wrap:anywhere">${bz.configured ? `Callback URL to register at B2BINPAY: <span class="mono">${esc(s.integrations.b2binpay_callback)}</span>${bz.callback_secret ? "" : " · add B2BINPAY_CALLBACK_SECRET to .env"}` : "Add B2BINPAY_API_KEY, B2BINPAY_API_SECRET and B2BINPAY_CALLBACK_SECRET to .env, restart, then choose B2BINPAY on the USDT payment method below."}</p></div><span class="sp"></span>${bz.configured ? '<button type="button" class="c-btn" id="bzW">Find wallet IDs</button>' : ""}</div>` : ""}
 ${cy ? `<div class="c-card" style="max-width:980px"><b>CyrafaPay (Visa / Mastercard)</b> ${cy.configured ? `<span class="c-pill plain" style="--c:var(--up)">Connected${cy.test ? " · test" : ""}</span>` : '<span class="c-pill plain">Not set up</span>'}<p class="muted" style="font-size:12.5px;overflow-wrap:anywhere">${cy.configured ? `Charged in ${esc(cy.currency)} at ${esc(cy.rate)} per $1. Webhook URL to give Cyrafa: <span class="mono">${esc(s.integrations.cyrafa_callback)}</span>${cy.webhook_secret ? "" : " · add CYRAFA_PARTNER_SECRET to .env"}` : "Add CYRAFA_PARTNER_ID, CYRAFA_MERCHANT_ID and CYRAFA_PARTNER_SECRET to .env, restart, then choose CyrafaPay on the card payment method below."}</p></div>` : ""}
-=======
-      page.innerHTML = `${bz ? `<div class="c-card c-row" style="max-width:980px"><div><b>B2BINPAY (crypto payments)</b> ${bz.configured ? `<span class="c-pill plain" style="--c:var(--up)">Connected${bz.sandbox ? " · sandbox" : ""}</span>` : '<span class="c-pill plain">Not set up</span>'}<p class="muted" style="font-size:12.5px">${bz.configured ? `Callback URL to register at B2BINPAY: <span class="mono">${esc(s.integrations.b2binpay_callback)}</span>${bz.callback_secret ? "" : " · add B2BINPAY_CALLBACK_SECRET to .env"}` : "Add B2BINPAY_API_KEY, B2BINPAY_API_SECRET and B2BINPAY_CALLBACK_SECRET to .env, restart, then choose B2BINPAY on the USDT payment method below."}</p></div><span class="sp"></span>${bz.configured ? '<button type="button" class="c-btn" id="bzW">Find wallet IDs</button>' : ""}</div>` : ""}
-${cy ? `<div class="c-card" style="max-width:980px"><b>CyrafaPay (Visa / Mastercard)</b> ${cy.configured ? `<span class="c-pill plain" style="--c:var(--up)">Connected${cy.test ? " · test" : ""}</span>` : '<span class="c-pill plain">Not set up</span>'}<p class="muted" style="font-size:12.5px">${cy.configured ? `Charged in ${esc(cy.currency)} at ${esc(cy.rate)} per $1. Webhook URL to give Cyrafa: <span class="mono">${esc(s.integrations.cyrafa_callback)}</span>${cy.webhook_secret ? "" : " · add CYRAFA_PARTNER_SECRET to .env"}` : "Add CYRAFA_PARTNER_ID, CYRAFA_MERCHANT_ID and CYRAFA_PARTNER_SECRET to .env, restart, then choose CyrafaPay on the card payment method below."}</p></div>` : ""}
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       <form id="pf" class="c-card" style="display:grid;gap:16px;max-width:980px" novalidate>
         <h3>Brand and legal</h3><div class="c-grid">${field("Brand shown to clients", inp("brand", p.brand))}${field("Support email", inp("support_email", p.support_email || "", 'type="email"'))}${field("Legal line (footer of every page)", `<textarea class="c-ta" name="legal_line" rows="3">${esc(p.legal_line)}</textarea>`, "full")}${field("Risk warning", `<textarea class="c-ta" name="risk_warning" rows="3">${esc(p.risk_warning)}</textarea>`, "full")}</div>
         <p class="muted" style="font-size:12.5px">Have compliance approve these two texts. The licensed company has to be named on the client agreement, the legal line and bank payment details.</p>
         <h3>Rules</h3><div class="c-grid g3"><label class="c-switch"><input type="checkbox" name="enabled" ${p.enabled ? "checked" : ""}><span>Registration open</span></label><label class="c-switch"><input type="checkbox" name="require_kyc_for_live" ${p.require_kyc_for_live ? "checked" : ""}><span>KYC approved before a live account</span></label>${field("Two approvals for withdrawals over ($)", inp("second_approval_over", p.second_approval_over, 'type="number" min="0"'))}${field("Default MT5 server", inp("default_server", p.default_server || "", 'placeholder="e.g. AbselGlobal-Live"'))}</div>
-<<<<<<< HEAD
         ${api ? `<h3>MT5 actions</h3><label class="c-switch"><input type="checkbox" name="mt5_writes" ${m5.writes_enabled ? "checked" : ""}><span>Let the back office write to MT5 (create accounts, credit and debit balances after approval)</span></label><p class="muted" style="font-size:12.5px">Off: operations keeps doing these in MT5 Manager and records them here. Every money movement always needs approval in the back office first.</p>` : ""}
         <h3>Account types <button type="button" class="c-btn sm" id="addT">Add</button></h3><p class="muted" style="font-size:12.5px;margin-top:-8px">MT5 groups come only from here (never from clients). Copy the group names exactly as in MT5, e.g. <span class="mono">real\absel-global\ecn</span>.</p><div id="types" style="display:grid;gap:10px">${(p.account_types || []).map(tRow).join("")}</div>
-=======
-        <h3>Account types <button type="button" class="c-btn sm" id="addT">Add</button></h3><div id="types" style="display:grid;gap:10px">${(p.account_types || []).map(tRow).join("")}</div>
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         <h3>Payment methods <button type="button" class="c-btn sm" id="addM">Add</button></h3><div id="methods" style="display:grid;gap:10px">${(p.methods || []).map(mRow).join("")}</div>
         <h3>MetaTrader 5 download links</h3><div class="c-grid">${["windows", "ios", "android", "web"].map(k => field(k === "ios" ? "iPhone" : k[0].toUpperCase() + k.slice(1), inp("pl_" + k, (p.platform_links || {})[k] || ""))).join("")}</div>
         <p class="err-msg" hidden></p><div><button class="c-btn pri" type="submit">Save client area settings</button></div></form>`;
       const bw = $("#bzW"); if (bw) bw.addEventListener("click", async () => { try { const w = await API.call("gatewayWallets"); modal({ title: "B2BINPAY wallets", wide: true, body: w.length ? `<table class="c-table"><thead><tr><th>Wallet ID</th><th>Name</th><th>Type</th><th class="r">Balance</th></tr></thead><tbody>${w.map(x => `<tr><td class="mono"><b>${esc(x.id)}</b></td><td>${esc(x.label)}</td><td>${x.type === 1 ? "Merchant" : x.type === 2 ? "Enterprise" : esc(x.type)}</td><td class="num">${esc(x.balance)}</td></tr>`).join("")}</tbody></table><p class="muted" style="font-size:12.5px">Use a Merchant wallet for USDT deposits: it gives each deposit its own payment page, amount and time limit.</p>` : "<p>No wallets found.</p>" }); } catch (e) { toast(e.message); } });
-<<<<<<< HEAD
       C.wireMt5Card(page);
       const wireDel = () => $$("[data-del]").forEach(b => { b.onclick = () => b.closest("[data-t],[data-m]").remove(); });
       wireDel();
       $("#addT").addEventListener("click", () => { $("#types").insertAdjacentHTML("beforeend", tRow({ name: "", id: "", min_deposit: 100, leverages: [100], currencies: ["USD"], mt5_group: "", mt5_demo_group: "" })); wireDel(); });
-=======
-      const wireDel = () => $$("[data-del]").forEach(b => { b.onclick = () => b.closest("[data-t],[data-m]").remove(); });
-      wireDel();
-      $("#addT").addEventListener("click", () => { $("#types").insertAdjacentHTML("beforeend", tRow({ name: "", id: "", min_deposit: 100, leverages: [100], currencies: ["USD"] })); wireDel(); });
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       $("#addM").addEventListener("click", () => { $("#methods").insertAdjacentHTML("beforeend", mRow({ name: "", id: "", kind: "other", min: 50 })); wireDel(); });
       const rd = el => Object.fromEntries($$("[name]", el).map(i => [i.name, i.type === "checkbox" ? i.checked : i.value]));
       $("#pf").addEventListener("submit", async e => {
@@ -408,13 +324,9 @@ ${cy ? `<div class="c-card" style="max-width:980px"><b>CyrafaPay (Visa / Masterc
         const top = {}; ["brand", "support_email", "legal_line", "risk_warning", "second_approval_over", "default_server"].forEach(k => top[k] = f.elements[k].value); top.enabled = f.elements.enabled.checked; top.require_kyc_for_live = f.elements.require_kyc_for_live.checked;
         top.account_types = $$("[data-t]", f).map(rd); top.methods = $$("[data-m]", f).map(rd);
         top.platform_links = Object.fromEntries(["windows", "ios", "android", "web"].map(k => [k, f.elements["pl_" + k].value]));
-<<<<<<< HEAD
         const extra = f.elements.mt5_writes ? { mt5: { writes_enabled: f.elements.mt5_writes.checked } } : {};
         if (extra.mt5 && extra.mt5.writes_enabled && !m5.writes_enabled && !(await C.confirmBox("Switch on MT5 writes", "From now on, approving in the back office creates MT5 accounts and credits or debits MT5 balances. Check the MT5 groups and the login range first.", "Switch on"))) return;
         try { await API.call("saveSettings", Object.assign({ portal: top }, extra)); toast("Saved"); await C.updateBadges(); C.render(); } catch (err) { er.textContent = err.message; er.hidden = false; }
-=======
-        try { await API.call("saveSettings", { portal: top }); toast("Saved"); await C.updateBadges(); C.render(); } catch (err) { er.textContent = err.message; er.hidden = false; }
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       });
     },
   };

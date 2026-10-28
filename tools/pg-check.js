@@ -24,7 +24,7 @@ const hint = msg => {
   return "Send this message to your developer or Neon support.";
 };
 (async () => {
-  const url = (process.env.DATABASE_URL || "").trim(), schema = (process.env.DATABASE_SCHEMA || "public").trim(), apply = process.argv.includes("--apply");
+  const url = (process.env.DATABASE_URL || "").trim(), schema = (process.env.DATABASE_SCHEMA || process.env.DB_SCHEMA || "public").trim(), apply = process.argv.includes("--apply");
   if (!url) { console.log("DATABASE_URL is empty: the server uses the SQLite file", process.env.DB_FILE || "./db/crm.db"); process.exit(0); }
   let sql;
   try { sql = neon(url); console.log("✔ Connection string looks right · host", sql.host, "· schema", schema); }

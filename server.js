@@ -1,10 +1,6 @@
 /**
  * Absel Global — website + lead API + Absel CRM
-<<<<<<< HEAD
  * Zero dependencies: Node.js 22.13+ (built-in http, crypto and node:sqlite).
-=======
- * Node.js 22.13+ (built-in http, crypto and node:sqlite). PostgreSQL (DATABASE_URL) uses the "pg" package.
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
  *
  *   cp .env.example .env    (edit it)
  *   node server.js
@@ -19,7 +15,6 @@ const ROOT = __dirname;
 try { process.loadEnvFile(path.join(ROOT, ".env")); } catch { /* optional */ }
 
 const { createCRM, CrmError } = require("./lib/core.js");
-<<<<<<< HEAD
 const { openStore } = require("./lib/store-sqlite.js");
 const { openStorePg } = require("./lib/store-pg.js");
 const channels = require("./lib/channels.js");
@@ -31,16 +26,6 @@ const mt5Actions = require("./lib/mt5-actions.js");
 
 /* ------------------------------------------------------------------ config */
 const PORT = Number(process.env.PORT || 3000);
-=======
-const channels = require("./lib/channels.js");
-const b2b = require("./lib/b2binpay.js");
-const cyrafa = require("./lib/cyrafa.js");
-
-/* ------------------------------------------------------------------ config */
-const PORT = Number(process.env.PORT || 3000);
-const DATABASE_URL = (process.env.DATABASE_URL || "").trim();
-const DB_SCHEMA = (process.env.DB_SCHEMA || "public").trim();
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 const DB_FILE = path.resolve(ROOT, process.env.DB_FILE || "db/crm.db");
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const SESSION_HOURS = Number(process.env.SESSION_HOURS || 12);
@@ -72,7 +57,6 @@ function verifyPassword(p, stored) {
 const DUMMY_HASH = hashPassword(crypto.randomBytes(12).toString("hex")); // keeps "unknown user" as slow as "wrong password"
 
 /* ------------------------------------------------------------- CRM + queue */
-<<<<<<< HEAD
 // The database: Postgres (Neon) when DATABASE_URL is set, otherwise the SQLite file. Opened in boot() below.
 let store, crm;
 const sendQueue = [];
@@ -81,47 +65,33 @@ const unsubToken = id => Buffer.from(id).toString("base64url") + "." + crypto.cr
 async function openDatabase() {
   const schemaFile = path.join(ROOT, "db", "schema.sql");
   if (!env("DATABASE_URL")) return openStore(DB_FILE, schemaFile);
-  return openStorePg(env("DATABASE_URL"), { schemaFile, schema: env("DATABASE_SCHEMA") || "public", journal: path.resolve(ROOT, env("DATABASE_JOURNAL") || "db/pg-journal.jsonl") });
+  return openStorePg(env("DATABASE_URL"), { schemaFile, schema: env("DATABASE_SCHEMA") || env("DB_SCHEMA") || "public", journal: path.resolve(ROOT, env("DATABASE_JOURNAL") || "db/pg-journal.jsonl") });
+}
+// A Neon database that was asleep can take a while to answer the first time: try a few times before giving up.
+async function openDatabaseRetry() {
+  for (let i = 1; ; i++) {
+    try { return await openDatabase(); }
+    catch (e) { if (!env("DATABASE_URL") || i >= 4) throw e; console.error(`Database not ready (${e.message}), trying again in ${5 * i} s…`); await new Promise(r => setTimeout(r, 5000 * i)); }
+  }
 }
 async function boot() {
-  try { store = await openDatabase(); }
+  try { store = await openDatabaseRetry(); }
   catch (e) { console.error("✖ Couldn't open the database: " + e.message + (env("DATABASE_URL") ? "\n  Check DATABASE_URL in .env (run: node tools/pg-check.js)." : "")); process.exit(1); }
   crm = createCRM({ store, hashPassword, verifyPassword, random: n => new Uint8Array(crypto.randomBytes(n)), onQueue: m => sendQueue.push(m.id), mt5Mode: () => mt5.cfg().mode,
     hashToken: t => crypto.createHash("sha256").update(String(t)).digest("hex"),
     unsubscribeUrl: l => (crm.getSettings().site_url || "") + "/unsubscribe?t=" + unsubToken(l.id) });
-=======
-// PostgreSQL when DATABASE_URL is set (loads in the background, see boot() below), otherwise the SQLite file
-const store = DATABASE_URL
-  ? require("./lib/store-postgres.js").openStore(DATABASE_URL, path.join(ROOT, "db", "schema-postgres.sql"), DB_SCHEMA)
-  : require("./lib/store-sqlite.js").openStore(DB_FILE, path.join(ROOT, "db", "schema.sql"));
-let booted = false;
-const sendQueue = [];
-// One-click unsubscribe links in marketing emails: /unsubscribe?t=<lead id>.<signature>
-const unsubToken = id => Buffer.from(id).toString("base64url") + "." + crypto.createHmac("sha256", SESSION_SECRET).update("unsub:" + id).digest("base64url").slice(0, 22);
-const crm = createCRM({ store, hashPassword, verifyPassword, random: n => new Uint8Array(crypto.randomBytes(n)), onQueue: m => sendQueue.push(m.id),
-  hashToken: t => crypto.createHash("sha256").update(String(t)).digest("hex"),
-  unsubscribeUrl: l => (crm.getSettings().site_url || "") + "/unsubscribe?t=" + unsubToken(l.id) });
-async function initData() {
-  await store.ready;
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   store.transaction(() => crm.ensureDefaults());
 
   // First start: create the admin from .env
   if (!store.all("users").some(u => u.role === "admin")) {
     const u = (process.env.ADMIN_USERNAME || "").trim(), p = process.env.ADMIN_PASSWORD || "";
-<<<<<<< HEAD
     if (!u || p.length < 10) { console.error("✖ First start: set ADMIN_USERNAME and ADMIN_PASSWORD (10+ characters, letters and numbers) in .env to create the admin login."); process.exit(1); }
     try { store.transaction(() => crm.saveUser(crm.SYSTEM, { name: process.env.ADMIN_NAME || "Administrator", username: u, password: p, role: "admin", email: process.env.ADMIN_EMAIL || "", accepts_leads: false, must_change_password: true })); }
     catch (e) { console.error("✖ " + e.message); process.exit(1); }
-=======
-    if (!u || p.length < 10) throw new Error("First start: set ADMIN_USERNAME and ADMIN_PASSWORD (10+ characters, letters and numbers) in .env to create the admin login.");
-    store.transaction(() => crm.saveUser(crm.SYSTEM, { name: process.env.ADMIN_NAME || "Administrator", username: u, password: p, role: "admin", email: process.env.ADMIN_EMAIL || "", accepts_leads: false, must_change_password: true }));
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     console.log(`✔ Admin user "${u}" created. It must choose a new password at first sign-in. Remove ADMIN_PASSWORD from .env now.`);
   }
   // Re-queue anything left unsent by a previous run
   store.all("messages").filter(m => m.status === "queued").forEach(m => sendQueue.push(m.id));
-<<<<<<< HEAD
 
   setInterval(() => { try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); dailyMis().catch(e => console.error("MIS email:", e.message)); }, 30000).unref();
   setTimeout(() => { store.transaction(() => crm.tick()); drainQueue(); }, 3000).unref();
@@ -131,9 +101,6 @@ async function initData() {
 }
 // Postgres: finish sending saved changes before the process stops
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, async () => { if (store && store.flush) { const ok = await store.flush(10000); if (!ok) console.error("✖ Some changes weren't sent to the database yet; they're kept in the journal and sent at the next start."); } process.exit(0); });
-=======
-}
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 let sending = false;
 async function drainQueue() {
@@ -154,10 +121,6 @@ async function drainQueue() {
     }
   } finally { sending = false; }
 }
-<<<<<<< HEAD
-=======
-setInterval(() => { if (!booted) return; try { store.transaction(() => crm.tick()); } catch (e) { console.error("automation tick:", e); } drainQueue(); dailyMis().catch(e => console.error("MIS email:", e.message)); }, 30000).unref();
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 /* ------------------------------------------------------- daily MIS email */
 async function sendMis(day, to) {
@@ -208,20 +171,15 @@ const cookie = (v, age) => `ag_crm=${encodeURIComponent(v)}; Path=/; HttpOnly; S
 
 const SEC = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Frame-Options": "SAMEORIGIN", ...(IS_PROD ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" } : {}) };
 function send(res, status, body, headers = {}) {
-<<<<<<< HEAD
-  const str = typeof body === "string";
-  res.writeHead(status, { ...SEC, "Content-Type": str ? "text/plain; charset=utf-8" : "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
-  res.end(str ? body : JSON.stringify(body));
-=======
   if (res.sending) return; res.sending = true;
   const str = typeof body === "string";
   const write = () => {
     res.writeHead(status, { ...SEC, "Content-Type": str ? "text/plain; charset=utf-8" : "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers });
     res.end(str ? body : JSON.stringify(body));
   };
-  // PostgreSQL: answer only after this request's changes are saved
-  return store.pending && store.pending() ? store.flush().then(write) : write();
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
+  // Postgres: answer only after this request's changes are in the database (the server's disk may not survive a restart).
+  // After 10 s the answer goes anyway; the changes stay queued and in the journal.
+  return store && store.kind === "postgres" && store.status().pending ? store.flush(10000).then(write) : write();
 }
 function readBody(req, limit = 4 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
@@ -253,10 +211,7 @@ function serveStatic(req, res, pathname) {
   }
   if (rel.startsWith("/crm/")) return send(res, 404, "Not found"); // hide the default path when CRM_PATH is customised
   if (rel === "/portal") return send(res, 301, "", { Location: "/portal/" });
-<<<<<<< HEAD
   if (rel === "/partners" || rel === "/partners/") return send(res, 301, "", { Location: "/#partners" });
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   if (rel.startsWith("/portal/")) {
     const file = path.normalize(path.join(PUBLIC, rel.endsWith("/") ? rel + "index.html" : rel));
     if (!file.startsWith(path.join(PUBLIC, "portal") + path.sep)) return send(res, 403, "Forbidden");
@@ -314,7 +269,6 @@ const RPC = {
   listAccountRequests: (u, f) => crm.listAccountRequests(u, f), openAccount: (u, id, d) => crm.openAccount(u, id, d), rejectAccount: (u, id, why) => crm.rejectAccount(u, id, why),
   setAccountPassword: (u, id, pw) => crm.setAccountPassword(u, id, pw), updateAccount: (u, id, d) => crm.updateAccount(u, id, d),
   listPayments: (u, f) => crm.listPayments(u, f), decidePayment: (u, id, a, d) => crm.decidePayment(u, id, a, d), importBalances: (u, rows) => crm.importBalances(u, rows),
-<<<<<<< HEAD
   // MT5 Web API
   mt5Status: u => Object.assign(crm.mt5Status(u), { api: mt5.status(), syncing: mt5Syncing }), listMt5Unlinked: (u, f) => crm.listMt5Unlinked(u, f), mt5LinkAccount: (u, id, d) => crm.mt5LinkAccount(u, id, d),
   mt5IgnoreUnlinked: (u, id, why) => crm.mt5IgnoreUnlinked(u, id, why), mt5Reconcile: (u, f) => crm.mt5Reconcile(u, f), listMt5Ops: (u, f) => crm.listMt5Ops(u, f),
@@ -325,8 +279,6 @@ const RPC = {
   markChargeback: (u, id, why) => crm.markChargeback(u, id, why), ibMonthReview: (u, f) => crm.ibMonthReview(u, f), ibApprovePeriod: (u, id, p) => crm.ibApprovePeriod(u, id, p),
   ibLineAction: (u, id, a, why) => crm.ibLineAction(u, id, a, why), ibAdjust: (u, id, amt, why, p) => crm.ibAdjust(u, id, amt, why, p), ibReport: (u, f) => crm.ibReport(u, f),
   uploadIbMaterial: (u, f) => crm.uploadIbMaterial(u, f), listIbMaterials: u => crm.listIbMaterials(u), deleteIbMaterial: (u, id) => crm.deleteIbMaterial(u, id),
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   approveBroadcast: (u, id, ok, why) => crm.approveBroadcast(u, id, ok, why), cancelBroadcast: (u, id) => crm.cancelBroadcast(u, id), listBroadcasts: u => crm.listBroadcasts(u), getBroadcast: (u, id) => crm.getBroadcast(u, id),
 };
 // Actions that call out to other systems (async, outside the database transaction)
@@ -345,7 +297,6 @@ const ASYNC_RPC = {
     if (!r.ok) throw new CrmError("The phone system refused the call (" + r.status + "). Dial manually for now.");
     return { mode: "click", number: info.number, extension: info.extension };
   },
-<<<<<<< HEAD
   // MT5 actions after approval (api mode with MT5 actions switched on). The core records the approval and the operation;
   // here it is sent to MT5 and the result recorded. A failure leaves a visible error on the request.
   async mt5Payment(u, id, action, d) { const r = store.transaction(() => crm.mt5PaymentAction(u, id, action, d || {})); return mt5Run(r.op, r.payment, "payment"); },
@@ -359,8 +310,6 @@ const ASYNC_RPC = {
     if (mt5.cfg().mode !== "api") throw new CrmError("MT5 is in manual mode (MT5_MODE=manual in .env).");
     try { const r = await mt5Sync(); drainQueue(); return r; } catch (e) { throw new CrmError("MT5 sync failed: " + e.message); }
   },
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   async sendMisNow(u) {
     if (u.role !== "admin") throw new CrmError("Only admins can do this.", 403);
     const cfg = crm.getSettings().mis_email || {};
@@ -376,10 +325,7 @@ function integrations() {
     telephony_click: !!env("TELEPHONY_CLICK_URL"), telephony_webhook: !!env("TELEPHONY_WEBHOOK_TOKEN"),
     b2binpay: b2b.status(), b2binpay_callback: siteUrl() + "/webhooks/payments/b2binpay",
     cyrafa: cyrafa.status(), cyrafa_callback: siteUrl() + "/webhooks/payments/cyrafa",
-<<<<<<< HEAD
     mt5: mt5.status(), database: store.status ? store.status() : { kind: "sqlite", file: path.basename(DB_FILE) },
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   };
 }
 
@@ -438,13 +384,10 @@ const PORTAL_RPC = {
   requestAccount: (c, p) => crm.portalRequestAccount(c, p), revealPassword: (c, id) => crm.portalRevealPassword(c, id),
   deposit: (c, d) => crm.portalDeposit(c, d), withdraw: (c, d) => crm.portalWithdraw(c, d), transfer: (c, d) => crm.portalTransfer(c, d), cancel: (c, id) => crm.portalCancel(c, id), track: (c, ev) => crm.portalTrack(c, ev), history: (c, f) => crm.portalHistory(c, f),
   totpBegin: c => crm.portalTotpBegin(c), totpEnable: (c, code) => crm.portalTotpEnable(c, code), totpDisable: (c, code) => crm.portalTotpDisable(c, code),
-<<<<<<< HEAD
   // Partner section (clients are masked)
   ibMe: c => crm.portalIbMe(c), ibApply: (c, d, meta) => crm.portalIbApply(c, d, meta), ibDashboard: (c, f) => crm.portalIbDashboard(c, f || {}), ibClients: (c, f) => crm.portalIbClients(c, f || {}),
   ibSubs: (c, f) => crm.portalIbSubs(c, f || {}), ibCommissions: (c, f) => crm.portalIbCommissions(c, f || {}), ibPayout: (c, d) => crm.portalIbPayout(c, d || {}), ibPayouts: c => crm.portalIbPayouts(c),
   ibMaterials: c => crm.portalIbMaterials(c), ibMaterialFile: (c, id) => crm.portalIbMaterialFile(c, id),
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 };
 const portalErr = (res, e) => { if (e instanceof CrmError) return send(res, e.code === 401 ? 401 : e.code === 404 ? 404 : e.code === 403 ? 403 : 422, { ok: false, error: e.message, fields: e.fields }); throw e; };
 async function portal(req, res, p) {
@@ -501,15 +444,10 @@ async function portal(req, res, p) {
     if (p === "rpc") {
       const b = await readJson(req, 9 * 1024 * 1024), fn = PORTAL_RPC[b.method];
       if (!fn) return send(res, 404, { ok: false, error: "Unknown action" });
-<<<<<<< HEAD
       const args = Array.isArray(b.args) ? b.args.slice(0, 4) : []; if (b.method === "ibApply") args[1] = meta; // the agreement records the IP it was accepted from
       let result = store.transaction(() => fn(c, ...args)); drainQueue();
       if (b.method === "deposit" && result.gateway && result.gateway.status === "creating") result = await startGatewayPayment(result);
       if (b.method === "requestAccount") result = await autoDemo(result);
-=======
-      let result = store.transaction(() => fn(c, ...(Array.isArray(b.args) ? b.args : []))); drainQueue();
-      if (b.method === "deposit" && result.gateway && result.gateway.status === "creating") result = await startGatewayPayment(result);
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       return send(res, 200, { ok: true, result });
     }
     return send(res, 404, { ok: false, error: "Not found" });
@@ -566,7 +504,6 @@ async function cyrafaWebhook(req, res) {
   } catch (e) { console.error("Cyrafa webhook:", e.message); }
   res.writeHead(200, SEC); res.end();
 }
-<<<<<<< HEAD
 /* ----------------------------------------------------------- MT5 Web API */
 // Read-only sync every MT5_SYNC_SECONDS in api mode: balances, deals, open positions. One run at a time.
 let mt5Syncing = false;
@@ -622,16 +559,6 @@ function referral(req, res, p, url) {
   if (r.ok && join) q.set("join", "partner");
   return send(res, 302, "", { Location: "/" + (q.toString() ? "?" + q : "") + (join ? "#partners" : ""), "Cache-Control": "no-store", "X-Robots-Tag": "noindex" });
 }
-=======
-// Safety net for missed callbacks: every 10 minutes re-check open crypto payments
-setInterval(async () => {
-  if (!booted || !b2b.configured()) return;
-  for (const p of crm.gatewayPayments().filter(x => x.provider === "b2binpay").slice(0, 50)) {
-    try { const info = await b2b.getDeposit(p.ext_id); await applyB2b(p.id, info, null, ""); } catch (e) { console.error("B2BINPAY check", p.ext_id, e.message); }
-  }
-  drainQueue();
-}, 10 * 60e3).unref();
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 /* ---------------------------------------------------------------- routes */
 async function publicLead(req, res) {
@@ -808,16 +735,12 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/crm/rpc" && m === "POST") return await rpc(req, res);
     if (p.startsWith("/api/portal/") && m === "POST") return await portal(req, res, p.slice(12));
     if (p.startsWith("/api/")) return send(res, 404, { ok: false, error: "Not found" });
-<<<<<<< HEAD
     if (/^\/r\/[A-Za-z0-9]{4,12}(\/[^/]{0,60})?\/?$/.test(p) && m === "GET") return referral(req, res, p, url);
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     if (m !== "GET" && m !== "HEAD") return send(res, 405, "Method not allowed");
     return serveStatic(req, res, p);
   } catch (e) {
     if (e.status) return send(res, e.status, { ok: false, error: e.message });
     console.error(e);
-<<<<<<< HEAD
     if (!res.headersSent) send(res, 500, { ok: false, error: "Server error" });
   }
 });
@@ -835,32 +758,3 @@ function listen() {
   });
 }
 boot();
-=======
-    if (!res.headersSent && !res.sending) send(res, 500, { ok: false, error: "Server error" });
-  }
-});
-
-// Load the data first (PostgreSQL loads asynchronously), then accept requests
-initData().then(() => {
-  booted = true;
-  setTimeout(() => { store.transaction(() => crm.tick()); drainQueue(); }, 3000).unref();
-  server.listen(PORT, () => {
-    const c = channels.status();
-    console.log(`✔ Absel Global running on http://localhost:${PORT}`);
-    console.log(`  CRM:        http://localhost:${PORT}${CRM_PATH}/`);
-    console.log(`  Client area: http://localhost:${PORT}/portal/`);
-    console.log(`  Database:   ${store.label || DB_FILE}`);
-    console.log(`  Email:      ${c.email.configured ? c.email.provider + " (" + c.email.from + ")" : "not configured — messages are logged as skipped"}`);
-    console.log(`  WhatsApp:   ${c.whatsapp.configured ? "Cloud API connected" : "not configured — messages are logged as skipped"}`);
-  });
-}).catch(e => { console.error("✖ " + (e.message || e)); process.exit(1); });
-
-// Stop cleanly: finish writing pending changes to the database first
-let stopping = false;
-for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, async () => {
-  if (stopping) return; stopping = true;
-  server.close();
-  try { if (store.close) await Promise.race([store.close(), new Promise(r => setTimeout(r, 15000))]); } catch (e) { console.error("✖ Database:", e.message); }
-  process.exit(0);
-});
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00

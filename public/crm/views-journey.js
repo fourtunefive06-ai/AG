@@ -93,15 +93,11 @@
       else if (k === "b-cancel") modal({ title: "Cancel " + A + " account", body: field("Reason", inp("reason", "")), submit: "Cancel account", danger: true, onSubmit: async v => { await API.call("cancelBonus", b.id, v.reason); toast("Cancelled"); reload(); } });
     }));
   };
-<<<<<<< HEAD
   const mt5w = () => { const m = C.state.meta.mt5 || {}; return m.mode === "api" && m.writes_enabled; };
   C.approveBonus = (b, done) => mt5w()
     ? modal({ title: `Approve and credit ${"$" + b.amount} in MT5`, body: `<p class="muted">The company-funded ${"$" + b.amount} is credited in MT5 now (comment BONUS ${esc(b.id)}) and expires in ${cfg().expiry_days} days. The withdrawal rules stay the same.</p>${b.mt5_error ? `<div class="c-banner warn">${esc(b.mt5_error)}</div>` : ""}${field("MT5 login to credit", inp("account_id", b.account_id || "", 'inputmode="numeric"'))}${b.note ? `<p style="font-size:13px">Agent's note: ${esc(b.note)}</p>` : ""}`, submit: "Approve and credit in MT5",
         onSubmit: async v => { const r = /didn't confirm/.test(b.mt5_error || "") ? await API.call("mt5Check", b.id) : await API.call("mt5BonusCredit", b.id, { account_id: v.account_id }); if (!r.ok) throw new Error(r.unknown ? "MT5 didn't confirm. It is checked against MT5 before anything is sent again." : r.error || "MT5 refused the credit."); toast("Credited in MT5 · deal #" + r.ticket + ". The agent was told"); done(); } })
     : modal({ title: `Approve ${"$" + b.amount} for ${b.lead ? b.lead.name : "client"}`, body: `<p class="muted">Credit the balance in the back-office first, then confirm here. It expires in ${cfg().expiry_days} days.</p>${field("Trading account credited", inp("account_id", b.account_id || ""))}${b.note ? `<p style="font-size:13px">Agent's note: ${esc(b.note)}</p>` : ""}`, submit: "Approve & credit", onSubmit: async v => { await API.call("decideBonus", b.id, true, { account_id: v.account_id }); toast("Credited. The agent was told"); done(); } });
-=======
-  C.approveBonus = (b, done) => modal({ title: `Approve ${"$" + b.amount} for ${b.lead ? b.lead.name : "client"}`, body: `<p class="muted">Credit the balance in the back-office first, then confirm here. It expires in ${cfg().expiry_days} days.</p>${field("Trading account credited", inp("account_id", b.account_id || ""))}${b.note ? `<p style="font-size:13px">Agent's note: ${esc(b.note)}</p>` : ""}`, submit: "Approve & credit", onSubmit: async v => { await API.call("decideBonus", b.id, true, { account_id: v.account_id }); toast("Credited. The agent was told"); done(); } });
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   C.rejectBonus = (b, done) => modal({ title: "Reject request", body: field("Why? The agent sees this.", inp("reason", "", 'placeholder="e.g. Same household as an existing client"')), submit: "Reject", danger: true, onSubmit: async v => { await API.call("decideBonus", b.id, false, { reason: v.reason }); toast("Rejected"); done(); } });
 
   /* ------------------------------------------ calling scripts and concerns */

@@ -40,10 +40,7 @@
   const canComm = () => isMgr() || isMktMgr();
   const isOps = () => isAdmin() || role() === "operations";              // client-area operations (accounts, money)
   const isKyc = () => isOps() || role() === "compliance";                  // document review
-<<<<<<< HEAD
   const isPartnerships = () => isAdmin() || role() === "partnerships";    // IB / partner programme
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   const roleLabel = r => (C.state.meta && C.state.meta.role_labels && C.state.meta.role_labels[r]) || r;
   const salesUsers = () => C.state.meta.users.filter(u => u.sales);
   const stage = id => (C.state.meta.stages.find(s => s.id === id) || { id, label: id });
@@ -79,13 +76,10 @@
     star: I('<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/>'), broom: I('<path d="M19 3l-7 7"/><path d="M6 13l5 5-3 3-6-6 3-3z"/><path d="M9 10l5 5"/>'),
     megaphone: I('<path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 8a5 5 0 0 1 0 8"/>'), send: I('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     plug: I('<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/>'), shield: I('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'),
-<<<<<<< HEAD
     home: I('<path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/>'), handshake: I('<path d="M2 12l4-4 4 2 3-2 3 1 6 5"/><path d="M6 8v6l5 5a1.5 1.5 0 0 0 2-2l1 1a1.5 1.5 0 0 0 2-2l1 .5a1.5 1.5 0 0 0 1.5-2.5L14 9"/><path d="M2 12l3 3"/>'),
     apps: I('<rect x="4" y="4" width="4" height="4" rx="1"/><rect x="10" y="4" width="4" height="4" rx="1"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="4" y="10" width="4" height="4" rx="1"/><rect x="10" y="10" width="4" height="4" rx="1"/><rect x="16" y="10" width="4" height="4" rx="1"/><rect x="4" y="16" width="4" height="4" rx="1"/><rect x="10" y="16" width="4" height="4" rx="1"/><rect x="16" y="16" width="4" height="4" rx="1"/>'),
     help: I('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.8M12 17h.01"/>'), pin: I('<path d="M9 4h6l-1 6 4 3v2H6v-2l4-3z"/><path d="M12 15v6"/>'),
     plus: I('<path d="M12 5v14M5 12h14"/>'), search: I('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'), sidebar: I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>'),
-=======
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     pie: I('<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>'), coffee: I('<path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2M7 3v2M11 3v2M15 3v2"/>'),
   };
   const TL_ICON = { call: ICONS.phone, pbx: ICONS.phone, note: ICONS.note, message: ICONS.msg, stage: ICONS.flag, assign: ICONS.user, created: ICONS.user, task: ICONS.clock, automation: ICONS.bolt, edit: ICONS.note, deposit: ICONS.cash, checklist: ICONS.check, file: ICONS.upload, merge: ICONS.users, demo: ICONS.play, bonus: ICONS.gift, portal: ICONS.bank };
@@ -192,7 +186,6 @@
   C.href = path => (API.routePrefix || "#/") + path;
 
   /* --------------------------------------------------------------- shell */
-<<<<<<< HEAD
   // Hubs (Meta Business Suite style): a narrow rail of main areas, a sub-menu with the selected hub's pages.
   // Each item: [route, label, icon, who can see it, badge key, one-line description for All tools].
   // ACCESS (the route guard) is generated from this list, so access rules live in one place. Every route from earlier versions is kept.
@@ -545,57 +538,12 @@
     if (k === "g") { gAt = Date.now(); return; }
     if (k === "a" && Date.now() - gAt < 1200) { e.preventDefault(); gAt = 0; openTools(isPhone()); }
   });
-=======
-  // Two workspaces. Each item: [route, label, icon, who can see it, badge key]
-  // The brokerage lifecycle: acquire → sell → onboard → fund → trade → retain. Every route from earlier versions is kept.
-  const seesBiz = () => isMgr() || isMktMgr() || isOps();
-  const NAV = [
-    ["Overview", [["overview", "Business overview", "grid", seesBiz], ["dashboard", "Sales dashboard", "chart", isSales], ["ops", "Operations desk", "check", isKyc]]],
-    ["Acquisition", [["mkt", "Marketing overview", "pie", isMkt], ["campaigns", "Campaigns & spend", "megaphone", isMkt], ["broadcasts", "Broadcasts", "send", isMkt, "broadcasts"], ["sources", "Lead sources", "plug", isMkt], ["leads", "Leads (view only)", "list", () => isMkt() && !isSales()]]],
-    ["Sales", [["queue", "My day", "day", isSales, "queue"], ["call", "Calling mode", "phone", isSales], ["inbox", "Inbox", "inbox", isSales, "inbox"], ["leads", "Leads", "list", isSales], ["lifecycle", "Client journey", "route", () => isSales() || isMktMgr()], ["tasks", "Follow-ups", "check", isSales], ["pipeline", "Deposit pipeline", "funnel", isSales], ["bonus", "Demo & $100", "gift", isSales, "bonus"], ["targets", "Targets", "target", isSales]]],
-    ["Sales management", [["live", "Team live", "live", isMgr], ["quality", "Call quality", "star", isSales, "reviews"], ["hygiene", "Lead hygiene", "broom", isMgr], ["territories", "Territories", "map", isMgr]]],
-    ["Clients & onboarding", [["clients", "Clients", "users", () => isKyc() || isSales()], ["kyc", "KYC review", "idcard", isKyc, "kyc"], ["openacc", "Account opening", "bank", isOps, "accounts"]]],
-    ["Funding", [["money", "Deposits & withdrawals", "cash", () => isOps() || isMgr(), "money"], ["payperf", "Payment performance", "chart", () => isOps() || isMgr() || isMktMgr()], ["deposits", "FTD verification", "cash", isSales, "deposits"]]],
-    ["Trading", [["trading", "Trading accounts", "chart", () => isOps() || isMgr() || isKyc()], ["balances", "Trading data import", "upload", isOps]]],
-    ["Communication", [["templates", "Templates", "mail", () => canComm() || isMkt()], ["automations", "Automations", "bolt", () => canComm() || isMkt()], ["messages", "Message log", "msg", () => canComm() || isMkt()], ["optouts", "Opt-outs & DNC", "shield", () => isMgr() || isMkt()]]],
-    ["Reports", [["reports", "Reports & MIS", "chart", () => isSales() || isMkt() || isOps()]]],
-    ["Admin", [["team", "Team", "users", () => isMgr() || isMktMgr()], ["import", "Import leads", "upload", () => isMgr() || isMktMgr()], ["settings", "Settings", "gear", isAdmin], ["portalsettings", "Client area settings", "gear", isAdmin]]],
-  ];
-  const ACCESS = {}; NAV.forEach(([, items]) => items.forEach(i => { const prev = ACCESS[i[0]]; ACCESS[i[0]] = prev ? () => prev() || i[3]() : i[3]; }));
-  ACCESS.lead = () => true;
-  const home = () => (isMgr() ? "overview" : isSales() ? "queue" : isMkt() ? "mkt" : isOps() ? "ops" : isKyc() ? "kyc" : "overview");
-  C.home = home;
-  function shell() {
-    const u = C.state.user, m = C.state.meta;
-    const nav = NAV.map(([g, items]) => { const vis = items.filter(i => i[3]()); return vis.length ? `<h6>${g}</h6>` + vis.map(([k, l, ic, , badge]) => `<a href="${C.href(k)}" data-nav="${k}">${ICONS[ic]}<span>${l}</span>${badge ? `<b data-badge="${badge}" hidden></b>` : ""}</a>`).join("") : ""; }).join("");
-    const ws = isAdmin() ? "Admin" : isSales() && isMkt() ? "Sales + Marketing" : isMkt() ? "Marketing workspace" : isOps() ? "Operations" : isKyc() ? "Compliance" : "Sales workspace";
-    $("#crm").innerHTML = `<div class="c-shell"><aside class="c-side"><div class="c-logo"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="128" height="54"><small>BACK OFFICE · ${esc(ws.toUpperCase())}</small></div><nav class="c-nav" aria-label="CRM">${nav}</nav><div class="c-me"><b>${esc(u.name)}</b><span>${esc(roleLabel(u.role))}</span>${u.sample ? '<span style="display:block;color:#8FA0C8;font-size:11.5px;margin-top:4px">Sample account</span>' : ""}</div></aside><div class="c-scrim" data-act="closenav"></div>
-      <div class="c-main"><header class="c-top"><button class="c-btn ghost c-burger" data-act="opennav" aria-label="Menu">${ICONS.menu}</button><h1 id="cTitle"></h1><span class="sp"></span>
-      <input class="c-in c-search" id="cSearch" type="search" placeholder="Search name, phone, email, ref" aria-label="Search leads">
-      ${isSales() && u.role !== "admin" ? `<div style="position:relative"><button class="c-btn sm c-status" id="cStatus"></button></div>` : ""}
-      ${u.role === "agent" ? `<label class="c-switch" title="When off, territories skip you for new leads"><input type="checkbox" id="cAvail" ${u.accepts_leads !== false ? "checked" : ""}><span>Taking leads</span></label>` : ""}
-      <div class="c-bell" style="position:relative"><button class="c-btn ghost" id="cBell" aria-label="Notifications">${ICONS.bell}<b id="cUnread" ${m.unread ? "" : "hidden"}>${m.unread}</b></button></div>
-      <div style="position:relative"><button class="c-btn ghost" id="cUserBtn" aria-label="Account">${ICONS.user}</button></div></header>
-      <main class="c-page" id="cPage"></main></div></div>`;
-    $("#crm").addEventListener("click", shellClick);
-    $("#cSearch").addEventListener("keydown", e => { if (e.key === "Enter") C.go("leads", { q: e.target.value.trim() }); });
-    const av = $("#cAvail"); if (av) av.addEventListener("change", async () => { try { await API.call("setAvailability", av.checked); C.state.user.accepts_leads = av.checked; toast(av.checked ? "You're receiving new leads" : "New leads paused for you"); } catch (e) { toast(e.message); av.checked = !av.checked; } });
-    $("#cBell").addEventListener("click", openNotifications);
-    $("#cUserBtn").addEventListener("click", openUserMenu);
-    const sb = $("#cStatus"); if (sb) sb.addEventListener("click", openStatus);
-    drawBadges();
-  }
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   // Available / on break (breaks are reported in Team live and the Agent activity report; new leads skip you while on break)
   function drawStatus() {
     const b = $("#cStatus"); if (!b) return; const st = C.state.meta.status || {};
     b.className = "c-btn sm c-status " + (st.on_break ? "brk" : "ok");
-<<<<<<< HEAD
     const txt = st.on_break ? (st.break_reason || "On break") + " · " + ago(st.break_since).replace(" ago", "") : "Available";
     b.innerHTML = `<i></i><span>${esc(txt)}</span>`; b.setAttribute("aria-label", "Your status: " + txt); b.title = txt;
-=======
-    b.innerHTML = `<i></i>${st.on_break ? esc(st.break_reason || "On break") + " · " + esc(ago(st.break_since).replace(" ago", "")) : "Available"}`;
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   }
   async function openStatus(e) {
     e.stopPropagation(); if ($("#cStatusPop")) return closePops(); closePops();
@@ -606,7 +554,6 @@
   }
   function drawBadges() {
     const m = C.state.meta; if (!m) return;
-<<<<<<< HEAD
     const vals = { inbox: m.inbox_unread, deposits: m.deposits_pending, bonus: m.bonuses_pending, kyc: m.ops_pending ? m.ops_pending.kyc : 0, accounts: m.ops_pending ? m.ops_pending.accounts : 0, money: m.ops_pending ? m.ops_pending.money : 0, mt5unlinked: (m.mt5 || {}).unlinked || 0, ibapps: (m.ib || {}).applications || 0, ibpay: (m.ib || {}).payouts || 0, broadcasts: m.broadcasts_pending, reviews: m.reviews_new, queue: C.state.queueCount };
     $$("[data-badge]").forEach(b => { const n = vals[b.dataset.badge] || 0; b.textContent = n; b.hidden = !n; });
     // Each hub shows the sum of its pages' badges; More on the phone bar sums the hubs it hides.
@@ -614,15 +561,10 @@
     const tabs = tabHubs().map(h => h.hub).concat("home");
     $$("[data-hubbadge]").forEach(b => { const k = b.dataset.hubbadge, n = k === "more" ? shownHubs().filter(h => !tabs.includes(h.hub)).reduce((s, h) => s + hubSum(h), 0) : hubOf(k) ? hubSum(hubOf(k)) : 0; b.textContent = n > 99 ? "99+" : n; b.hidden = !n; const a = b.closest("a,button"); if (a) a.setAttribute("aria-label", (a.title || a.textContent.replace(/\d+\+?$/, "")).trim() + (n ? `, ${n} to do` : "")); });
     C.state.badges = vals; drawTodo();
-=======
-    const vals = { inbox: m.inbox_unread, deposits: m.deposits_pending, bonus: m.bonuses_pending, kyc: m.ops_pending ? m.ops_pending.kyc : 0, accounts: m.ops_pending ? m.ops_pending.accounts : 0, money: m.ops_pending ? m.ops_pending.money : 0, broadcasts: m.broadcasts_pending, reviews: m.reviews_new, queue: C.state.queueCount };
-    $$("[data-badge]").forEach(b => { const n = vals[b.dataset.badge] || 0; b.textContent = n; b.hidden = !n; });
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     drawStatus();
   }
   C.drawBadges = drawBadges;
   function shellClick(e) {
-<<<<<<< HEAD
     const a = e.target.closest("[data-act]");
     if (a) {
       const act = a.dataset.act;
@@ -643,11 +585,6 @@
       if (l.hasAttribute("data-hublink") && isTablet()) C.state.openSub = true;
       if (l.getAttribute("href") === location.hash) { e.preventDefault(); render(); }
     }
-=======
-    const a = e.target.closest("[data-act]"); if (!a) { if (e.target.closest(".c-nav a")) $("#crm").classList.remove("nav-open"); return; }
-    if (a.dataset.act === "opennav") $("#crm").classList.add("nav-open");
-    if (a.dataset.act === "closenav") $("#crm").classList.remove("nav-open");
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   }
   function closePops() { $$(".c-pop").forEach(p => p.remove()); }
   async function openNotifications(e) {
@@ -660,19 +597,11 @@
       $$(".it", p).forEach(b => b.addEventListener("click", async () => { closePops(); API.call("markRead", [b.dataset.id]).then(updateBadges); if (b.dataset.lead) C.go("lead/" + b.dataset.lead); }));
     } catch (err) { p.innerHTML = `<p style="padding:14px">${esc(err.message)}</p>`; }
   }
-<<<<<<< HEAD
   function openUserMenu(btn) {
     if ($("#cUserPop")) return closePops(); closePops();
     const u = C.state.user, p = document.createElement("div"); p.className = "c-pop"; p.id = "cUserPop"; p.style.width = "260px";
     p.innerHTML = `<div style="padding:12px 14px;border-bottom:1px solid var(--line)"><b>${esc(u.name)}</b><small class="muted" style="display:block">${esc(u.username)} · ${esc(roleLabel(u.role))}${u.sample ? " · Sample account" : ""}</small></div><button class="it" data-u="pw">Change password</button>${"Notification" in window && Notification.permission !== "granted" ? '<button class="it" data-u="alerts">Turn on desktop alerts<small>New leads, replies and approvals pop up even in another tab</small></button>' : ""}<button class="it" data-u="2fa">Two-step verification<small>${u.totp_enabled ? "On" : "Off"}</small></button><button class="it" data-u="out">Sign out</button>`;
     place(btn, p); menuKeys(p);
-=======
-  function openUserMenu(e) {
-    e.stopPropagation(); if ($("#cUserPop")) return closePops(); closePops();
-    const u = C.state.user, p = document.createElement("div"); p.className = "c-pop"; p.id = "cUserPop"; p.style.width = "260px";
-    p.innerHTML = `<div style="padding:12px 14px;border-bottom:1px solid var(--line)"><b>${esc(u.name)}</b><small class="muted" style="display:block">${esc(u.username)} · ${esc(roleLabel(u.role))}</small></div><button class="it" data-u="pw">Change password</button>${"Notification" in window && Notification.permission !== "granted" ? '<button class="it" data-u="alerts">Turn on desktop alerts<small>New leads, replies and approvals pop up even in another tab</small></button>' : ""}<button class="it" data-u="2fa">Two-step verification<small>${u.totp_enabled ? "On" : "Off"}</small></button><button class="it" data-u="out">Sign out</button>`;
-    e.currentTarget.parentElement.appendChild(p);
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     $$("[data-u]", p).forEach(b => b.addEventListener("click", async () => {
       closePops();
       if (b.dataset.u === "out") { await API.logout(); C.state.user = null; if (unsub) unsub(); loginScreen("You're signed out."); }
@@ -723,21 +652,13 @@
   let renderSeq = 0;
   async function render() {
     if (!C.state.user) return;
-<<<<<<< HEAD
     closePops(); closeOverlay();
     const sh = $("#cShell"); if (sh) { sh.classList.toggle("sub-open", !!C.state.openSub && isTablet()); C.state.openSub = false; const t = $("#cSubTog"); if (t && isTablet()) t.setAttribute("aria-expanded", sh.classList.contains("sub-open")); }
-=======
-    closePops(); $("#crm").classList.remove("nav-open");
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     const r = route(); let name = r.name || home();
     if (!C.views[name]) name = home();
     if (ACCESS[name] && !ACCESS[name]()) { if (name === home()) return; return C.go(home()); }
     const view = C.views[name];
-<<<<<<< HEAD
     updateNav(r, view.nav || name, view);
-=======
-    $$(".c-nav a").forEach(a => a.classList.toggle("on", a.dataset.nav === (view.nav || name)));
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
     const page = $("#cPage"); const seq = ++renderSeq; page.onclick = null;
     page.innerHTML = '<p class="muted">Loading…</p>';
     $("#cTitle").textContent = view.title || "";
@@ -801,9 +722,5 @@
   C.start = () => { window.addEventListener("hashchange", () => { if (C.state.user && (location.hash || "").startsWith(API.routePrefix || "#/")) render(); }); boot(); };
   C.boot = boot;
 
-<<<<<<< HEAD
   Object.assign(C, { esc, $, $$, num, money, pct, fDate, fTime, fDT, ago, dur, minsTxt, digits, telHref, waHref, localInput, fromLocalInput, todayStr, debounce, isMgr, isAdmin, isMkt, isMktMgr, isSales, seesAll, canComm, isOps, isKyc, isPartnerships, roleLabel, salesUsers, stage, stagePill, tempTag, outcomeLabel, userName, csv, downloadCsv, ICONS, TL_ICON, toast, modal, confirmBox, readForm, showErrors, clearErrors, field, inp, sel, chips, listInput, splitList, bars, hbars, heat, setUnread, setQueueCount, updateBadges });
-=======
-  Object.assign(C, { esc, $, $$, num, money, pct, fDate, fTime, fDT, ago, dur, minsTxt, digits, telHref, waHref, localInput, fromLocalInput, todayStr, debounce, isMgr, isAdmin, isMkt, isMktMgr, isSales, seesAll, canComm, isOps, isKyc, roleLabel, salesUsers, stage, stagePill, tempTag, outcomeLabel, userName, csv, downloadCsv, ICONS, TL_ICON, toast, modal, confirmBox, readForm, showErrors, clearErrors, field, inp, sel, chips, listInput, splitList, bars, hbars, heat, setUnread, setQueueCount, updateBadges });
->>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 })();
