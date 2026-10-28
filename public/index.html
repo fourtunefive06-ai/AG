@@ -589,7 +589,11 @@ window.ABSEL_CONFIG = {
       <p>Programmes for introducers, fund managers and strategy providers, with a dedicated partner manager.</p>
     </div>
     <div class="partners">
+<<<<<<< HEAD
       <div class="partner" id="ib-card"><span class="kind">IB programme</span><h3>Introducing Brokers</h3><p>Earn a commission on every lot your clients trade, plus an optional bonus per first deposit. Recruit sub-partners and earn an override on their clients. Track clicks, sign-ups and commission in the Partner section of the client area, with monthly payouts from $50 to your MT5 account, bank or USDT.</p><p class="ib-invite" hidden style="font-size:14px;margin:6px 0 0"></p><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-line" href="/portal/#register">Register, then apply</a><a class="btn btn-line" href="/portal/#partner">Sign in to apply</a></div></div>
+=======
+      <div class="partner"><span class="kind">IB programme</span><h3>Introducing Brokers</h3><p>Refer traders and earn competitive commissions on their volume, with real-time reporting in your partner area.</p><button class="btn btn-line" data-open-lead data-interest="Introducing Broker (IB)">Become an IB</button></div>
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       <div class="partner"><span class="kind">PAMM / MAM</span><h3>Money Managers</h3><p>Trade multiple client accounts from one master account with flexible allocation methods.</p><button class="btn btn-line" data-open-lead data-interest="PAMM / MAM">Talk to us</button></div>
       <div class="partner"><span class="kind">Copy trading</span><h3>Social Trading</h3><p>Publish your strategy and earn performance fees when followers copy your trades.</p><button class="btn btn-line" data-open-lead data-interest="Social trading">Become a provider</button></div>
     </div>
@@ -735,8 +739,11 @@ window.ABSEL_CONFIG = {
   var CFG=window.ABSEL_CONFIG||{};
   var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
   function store(k,v){try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){return null}}
+<<<<<<< HEAD
   // Partner (IB) referral link: /r/CODE sends visitors here with ?ib=CODE. First touch wins for 90 days.
   try{var ibq=new URLSearchParams(location.search),ibc=String(ibq.get("ib")||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,12),old=JSON.parse(localStorage.getItem("ag_ib")||"null");if(ibc&&!(old&&old.t>Date.now()-90*864e5))localStorage.setItem("ag_ib",JSON.stringify({code:ibc,t:Date.now()}));if(ibq.get("join")==="partner"&&ibc){document.addEventListener("DOMContentLoaded",function(){var el=document.querySelector("#ib-card .ib-invite");if(el){el.textContent="You were invited by partner "+ibc+". Register, then apply in the client area under Partner.";el.hidden=false}})}}catch(e){}
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   var reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* config links */
@@ -750,7 +757,11 @@ window.ABSEL_CONFIG = {
   COUNTRIES.sort(function(a,b){return a[0].localeCompare(b[0])});
 
   /* ---------- UTM attribution ---------- */
+<<<<<<< HEAD
   var utm={};try{var q=new URLSearchParams(location.search);["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid","fbclid","ref","ib"].forEach(function(k){if(q.get(k))utm[k]=q.get(k)});if(Object.keys(utm).length)store("ag_utm",JSON.stringify(utm));else utm=JSON.parse(store("ag_utm")||"{}")}catch(e){}
+=======
+  var utm={};try{var q=new URLSearchParams(location.search);["utm_source","utm_medium","utm_campaign","utm_content","utm_term","gclid","fbclid","ref"].forEach(function(k){if(q.get(k))utm[k]=q.get(k)});if(Object.keys(utm).length)store("ag_utm",JSON.stringify(utm));else utm=JSON.parse(store("ag_utm")||"{}")}catch(e){}
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   // Sign-up links carry the campaign so direct client-area registrations keep their source
   function regUrl(u){try{var qs=new URLSearchParams(utm);if(!utm.landing)qs.set("landing",location.href.split("#")[0].slice(0,300));var s=qs.toString();return s&&u.indexOf("#register")>=0&&u.indexOf("?")<0?u+"?"+s:u}catch(e){return u}}
   $$('a[href*="#register"]').forEach(function(a){a.setAttribute("href",regUrl(a.getAttribute("href")))});

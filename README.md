@@ -6,7 +6,11 @@ Website, client area and CRM for **Absel Global**, a trading name of Absel Marke
 * **Client area** (`public/portal/`, at `/portal/`): clients register, confirm their email, upload KYC documents, request live and demo MT5 accounts, deposit, withdraw, transfer between accounts and see their history. Two-step login, password reset, account lockout.
 * **Client app:** the client area is a Progressive Web App. Clients can install it on Android, iPhone (Safari → Share → Add to Home Screen), Windows and Mac; it opens full-screen, starts on their dashboard, loads instantly and shows an offline screen without a connection. Account and money data are never cached on the device. Installing needs the site on HTTPS (as in the go-live steps).
 * **Back office** (`public/crm/`, formerly "the CRM"): served at a secret path you choose (`CRM_PATH`), e.g. `https://abselglobal.com/team-desk/`. It is not indexed by search engines.
+<<<<<<< HEAD
 * **Backend** (`server.js` + `lib/`): no npm packages. It uses only Node.js built-ins, including Node's own SQLite.
+=======
+* **Backend** (`server.js` + `lib/`): Node.js built-ins plus one npm package, `pg`. Data lives in PostgreSQL (e.g. Neon) when `DATABASE_URL` is set, otherwise in Node's own SQLite. Run `npm install` once after cloning.
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 ---
 
@@ -21,7 +25,11 @@ The client area doesn't connect to MT5 or a payment provider. Every client reque
 | Sends a deposit (with receipt) | **Client money → Deposits** | Confirms the money arrived and credits MT5; enters the bank/PSP reference. The client's first deposit becomes a **verified FTD** for the sales agent automatically |
 | Requests a withdrawal | **Client money → Withdrawals** | Approves (two different people above the limit, default $1,000), pays, enters the payment reference |
 | Requests a transfer | **Client money → Transfers** | Moves the balance in MT5, marks it done |
+<<<<<<< HEAD
 | Sees balances | **Balance import**, or automatic with the MT5 Web API | Uploads the daily CSV (Login, Balance, Equity) from Absel Markets; clients see dated balances and can't withdraw more than that. With `MT5_MODE=api` balances, trades and positions are read from MT5 every few minutes (see below) |
+=======
+| Sees balances | **Balance import** | Uploads the daily CSV (Login, Balance, Equity) from Absel Markets; clients see dated balances and can't withdraw more than that |
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 Rules: KYC before a live account (switchable), KYC before any withdrawal, minimum first deposit per account type, method minimums and maximums, withdrawals held against the balance while pending. Bank details, wallet addresses, payment links, account types, leverages and the legal line are set in **CRM → Client area settings**.
 
@@ -53,6 +61,7 @@ Cyrafa sends each notification once, with no retries and no status API. If the c
 
 The client chooses USDT, an account and an amount. The server creates a B2BINPAY deposit (invoice) for that request: the client gets a payment page, an address with QR code, the exact amount and a countdown. B2BINPAY calls `https://<your site>/webhooks/payments/b2binpay` when money arrives; the callback signature is checked and the deposit is re-read from the B2BINPAY API before anything changes. The request then shows "Paid, credit MT5" in Deposits & withdrawals with the amount and transaction hash filled in: operations credits MT5 at Absel Markets and confirms with one click (a first deposit becomes the agent's verified FTD). Partly paid, late, overpaid and AML-flagged payments are held for a decision; unpaid invoices close when their time runs out; open payments are re-checked every 10 minutes in case a callback was missed. Withdrawals in USDT stay manual (two-person approval) for now.
 
+<<<<<<< HEAD
 **Set-up:** 1) put the B2BINPAY settings in `.env` (see `.env.example`), sandbox first, and restart; 2) in B2BINPAY, register the callback URL shown in Client area settings; 3) in Client area settings click *Find wallet IDs*, and on the USDT payment method choose *B2BINPAY (crypto)* and enter the Merchant wallet ID; 4) run `node tools/b2binpay-check.js` on the server: it signs in, lists the wallets and (with `<walletId> 10`) creates a test invoice, and says what to fix if a step fails; 5) make a sandbox deposit. A failed deposit also shows the provider's error in red on the request under Deposits & withdrawals → Cancelled. On the first real callback, check the server log: if it says "bad signature", tell your developer (the docs don't spell out the exact key format; the code accepts the common variants).
 
 ## MT5 Web API connection (read-only sync)
@@ -169,6 +178,13 @@ Tests: the IB block in `tools/simulate.js` (four IBs, every stage, holds, CPA, m
 - **Phone:** a bottom bar with Home, your three main areas and **More** (All tools as a sheet); the pages of the current area scroll across under the title.
 - Every page address (`#/leads`, `#/lead/…`, `#/money?type=withdrawal` and so on) is unchanged, so bookmarks and links in notifications and emails keep working. Pins, the hidden-menu choice, last pages and recent pages are kept per user in this browser only.
 - `node tools/nav-routes.js` lists which pages each role can open; `--save before.json` and `--compare before.json` prove a navigation change didn't give or take away access.
+=======
+**Set-up:** 1) put the B2BINPAY settings in `.env` (see `.env.example`), sandbox first, and restart; 2) in B2BINPAY, register the callback URL shown in Client area settings; 3) in Client area settings click *Find wallet IDs*, and on the USDT payment method choose *B2BINPAY (crypto)* and enter the Merchant wallet ID; 4) make a sandbox deposit. On the first real callback, check the server log: if it says "bad signature", tell your developer (the docs don't spell out the exact key format; the code accepts the common variants).
+
+## The back office, organised around the brokerage lifecycle
+
+Menus follow the client's path: **Overview** (Business overview, Sales dashboard, Operations desk) → **Acquisition** (marketing, campaigns, broadcasts, lead sources) → **Sales** (My day, calling, inbox, leads, Client journey, follow-ups, deposit pipeline, demo & $100, targets) → **Sales management** → **Clients & onboarding** (clients, KYC review, account opening) → **Funding** (deposits & withdrawals, FTD verification) → **Trading** (trading accounts, trading data import) → **Communication** → **Reports** → **Admin**. Every earlier screen and link still works.
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 **Business overview** (home for admins and sales managers): leads, client-area sign-ups, accounts opened, FTDs, deposits, withdrawals, net deposits, active traders and client balances for any period; the customer journey from lead to repeat deposit; what needs attention now (people stuck at each step, operations queues); daily leads/sign-ups and money in/out; the client book by lifecycle stage; results by source and agent.
 
@@ -345,11 +361,20 @@ Once connected:
 
 ## 5. Daily operations
 
+<<<<<<< HEAD
 * **Backups:** the entire CRM is one file. Back it up daily:
   ```bash
   0 3 * * * sqlite3 /var/www/absel-global/db/crm.db ".backup '/var/backups/crm-$(date +\%F).db'"
   ```
 * **BI / custom MIS:** `db/schema.sql` creates the SQL views `v_leads`, `v_calls`, `v_tasks`, `v_messages` and `v_users`. Point Metabase or Power BI at the database file, or query it with `sqlite3`.
+=======
+* **Backups:** with PostgreSQL (Neon), use Neon's point-in-time restore and branches, or a daily `pg_dump "$DATABASE_URL" > crm-$(date +%F).sql`. With SQLite the entire CRM is one file. Back it up daily:
+  ```bash
+  0 3 * * * sqlite3 /var/www/absel-global/db/crm.db ".backup '/var/backups/crm-$(date +\%F).db'"
+  ```
+* **One server process per database:** the CRM keeps the data in memory, so never run two copies (or PM2 cluster mode) against the same `DATABASE_URL`. To try changes without touching live data, set `DB_SCHEMA=staging` (or use a Neon branch).
+* **BI / custom MIS:** `db/schema-postgres.sql` (PostgreSQL) and `db/schema.sql` (SQLite) create the SQL views `v_leads`, `v_calls`, `v_tasks`, `v_messages`, `v_users`, `v_payments` and more. Point Metabase or Power BI at the database, or query it with `psql` / `sqlite3`.
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 * **Ad tracking:** tag campaign links like `https://abselglobal.com/?utm_source=google&utm_medium=cpc&utm_campaign=pk-ecn`. For IB partners use `?ref=IB1023`. Every lead keeps its source, campaign, ad, keyword, Google and Meta click IDs and partner code.
 * **Conversion tracking:** the website fires `generate_lead` (GTM / GA4) and `fbq('track','Lead')` on every lead.
 
@@ -393,6 +418,7 @@ Once connected:
 ### Upgrading an existing installation
 Replace the files and restart. New tables are created automatically, the new automations and templates are added once, and leads already funded get a verified deposit record, so targets and reports stay complete. Version 3.1 adds the demo and $100 automations and templates the same way. Then give people their new roles in Team (marketing staff → Marketing executive or Marketing manager).
 
+<<<<<<< HEAD
 ### Database: SQLite file or Postgres on Neon
 Without `DATABASE_URL` the app keeps everything in the SQLite file `DB_FILE`, as before. With `DATABASE_URL` set to a Neon connection string, Postgres is the database. Nothing to install: the app talks to Neon over HTTPS.
 * **Same layout on both.** There's one table per collection (`id`, `data` as JSONB, `updated_at`), and the reporting views from `db/schema.sql` are translated to Postgres automatically. Tables for new features are created at start, and existing data is never changed by the setup.
@@ -401,6 +427,8 @@ Without `DATABASE_URL` the app keeps everything in the SQLite file `DB_FILE`, as
 * **Check the connection:** `node tools/pg-check.js` reports the tables, views, row counts and unsent changes. `--apply` creates anything missing without touching data, and `--print` shows the Postgres view SQL. `node tools/pg-store-test.mjs` runs the store test in a throwaway schema that is dropped afterwards.
 * BI tools (Metabase, Power BI, Looker Studio) can connect to Neon directly and read the `v_*` views.
 
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 ### Moving data from the prototype (or another server)
 1. In the CRM, go to **Settings → Full backup → Download full backup** (admin only). The file contains client data, so keep it safe.
 2. On the server, stop the app and run:
@@ -416,24 +444,42 @@ Without `DATABASE_URL` the app keeps everything in the SQLite file `DB_FILE`, as
 ```
 server.js              web server, login, CRM API, WhatsApp webhook, automation worker
 lib/core.js            all CRM business logic (leads, routing, calls, scoring, automations, reports)
+<<<<<<< HEAD
+=======
+lib/store-postgres.js  PostgreSQL persistence (used when DATABASE_URL is set)
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 lib/store-sqlite.js    SQLite persistence
 lib/channels.js        email (SMTP, SendGrid, Brevo, Resend) and WhatsApp Cloud API
 lib/b2binpay.js        B2BINPAY API v3: token, deposits (invoices), callbacks
 lib/cyrafa.js          CyrafaPay card checkout sessions and signed webhooks
+<<<<<<< HEAD
 db/schema.sql          reporting views
 public/index.html      website
 public/portal/         client app (index.html, portal.js, manifest.webmanifest, sw.js service worker)
 public/crm/            CRM app: app.js (shell: hubs, page menu, All tools, search, roles), views-work.js (queue, calling, leads, lead page), views-sales.js (inbox, pipeline,
+=======
+db/schema.sql          reporting views (SQLite)
+db/schema-postgres.sql reporting views (PostgreSQL)
+public/index.html      website
+public/portal/         client app (index.html, portal.js, manifest.webmanifest, sw.js service worker)
+public/crm/            CRM app: app.js (shell, roles), views-work.js (queue, calling, leads, lead page), views-sales.js (inbox, pipeline,
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
                        deposits, targets, team live, call quality, hygiene), views-marketing.js (overview, campaigns, broadcasts,
                        lead sources, opt-outs), views-insights.js (dashboard, reports), views-admin.js (automations, templates, team, settings),
                        views-journey.js (demo and $100 account), views-ops.js (operations: KYC, accounts, client money, clients, balances),
                        views-overview.js (business overview, client journey, trading accounts)
 tools/simulate.js      30-day call-centre simulation: self-test incl. security checks (`npm test`) and demo data (`npm run demo`)
 tools/import-backup.js load a CRM backup into the server database
+<<<<<<< HEAD
 tools/nav-routes.js    pages and routes each back-office role can open (compare before and after a navigation change)
 ```
 
 **Capacity:** the CRM keeps all records in memory for instant reports and writes every change to SQLite immediately. It is comfortable up to about 100,000 leads on a 2 GB server.
+=======
+```
+
+**Capacity:** the CRM keeps all records in memory for instant reports and writes every change to the database immediately (PostgreSQL: in the background, usually within a second). It is comfortable up to about 100,000 leads on a 2 GB server.
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
 ## 8. Public API
 

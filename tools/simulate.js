@@ -513,6 +513,7 @@ console.log("✔ all checks passed");
   console.log("Payments:", { attempts: pr.total.attempts, success: pr.total.success_rate + "%", card: card.success_rate + "%", recovered: pr.recovery.recovered + "/" + pr.recovery.failed_clients });
 }
 
+<<<<<<< HEAD
 /* ---------- MT5 Web API read-only sync: fake MT5 rows through the core (the server reads MT5; the core stays network-free) ---------- */
 {
   const OPS = U.fatima, range = { from: 7000000, to: 7999999 }, iso = ms => new Date(ms).toISOString();
@@ -751,6 +752,8 @@ console.log("✔ all checks passed");
   console.log("IB:", { partners: store.size("partners"), lines: store.size("commissions"), held: store.all("commissions").filter(l => l.status === "held").length, paid: sumOf(store.all("commissions"), l => l.status === "paid"), payouts: store.all("payments").filter(p => p.type === "ib_payout").length });
 }
 
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 /* ---------- export: shift dates so the month ends "now", then dump or load ---------- */
 function shiftDates(obj, delta) {
   if (Array.isArray(obj)) return obj.map(x => shiftDates(x, delta));

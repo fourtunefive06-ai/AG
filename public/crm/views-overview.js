@@ -24,7 +24,10 @@
           ${kpi("Accounts opened", num(k.accounts_opened), "live MT5 accounts", "", "trading")}
           ${kpi("First deposits (FTD)", num(k.ftd), money(k.ftd_amount), "good", "reports/deposits")}
           ${kpi("Lead → FTD", pct(k.conversion), "of leads received in period")}
+<<<<<<< HEAD
           ${d.ib && (d.ib.active || d.ib.ftd) ? kpi("IB programme", num(d.ib.active) + " active IBs", `${num(d.ib.ftd)} IB-referred FTDs · ${pct(d.ib.deposit_share)} of deposits · ${money(d.ib.commission_due)} commission due`, "", C.isPartnerships() ? "ibreport" : "") : ""}
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         </div>
         <div class="c-kpis">
           ${kpi("Deposits", money(k.deposit_amount), `${num(k.deposits)} client-area deposits${k.redeposits ? " · " + num(k.redeposits) + " repeat" : ""}`, "good", "money?type=deposit&status=completed")}
@@ -156,16 +159,28 @@
     async render(page, r, alive) {
       const p = r.params, d = await API.call("listTradingAccounts", { activity: p.activity || "", q: p.q || "", kind: p.kind || "live" }); if (!alive()) return;
       const t = d.totals, can = isOps() || isMgr();
+<<<<<<< HEAD
       page.innerHTML = `<div class="c-kpis">${kpi("Accounts", num(t.accounts), p.kind === "demo" ? "demo" : "live, open")}${kpi("Balance", money(t.balance), "equity " + money(t.equity))}${kpi("Deposited", money(t.deposits), "withdrawn " + money(t.withdrawals))}${kpi("Lots traded", num(Math.round(t.lots * 100) / 100), (meta().mt5 || {}).mode === "api" ? "from MT5 deals" : "from the daily import")}</div>
+=======
+      page.innerHTML = `<div class="c-kpis">${kpi("Accounts", num(t.accounts), p.kind === "demo" ? "demo" : "live, open")}${kpi("Balance", money(t.balance), "equity " + money(t.equity))}${kpi("Deposited", money(t.deposits), "withdrawn " + money(t.withdrawals))}${kpi("Lots traded", num(Math.round(t.lots * 100) / 100), "from the daily import")}</div>
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         <div class="c-filters"><div class="c-seg">${[["", "All"]].concat(d.by_activity.map(x => [x.k, (ACT[x.k] || [x.k])[0] + " " + x.n])).map(([k, l]) => `<button data-a="${k}" class="${(p.activity || "") === k ? "on" : ""}">${esc(l)}</button>`).join("")}</div>
           <input class="c-in grow" type="search" id="tQ" value="${esc(p.q || "")}" placeholder="Search MT5 login, name or email">${sel("kind", [["live", "Live"], ["demo", "Demo"]], p.kind || "live", 'id="tK" aria-label="Kind"')}${isOps() ? `<a class="c-btn" href="${C.href("balances")}">Import trading data</a>` : ""}</div>
         <div class="c-tbox"><div class="c-scroll"><table class="c-table" style="min-width:1100px"><thead><tr><th>MT5 login</th><th>Client</th><th>Account</th><th class="r">Balance</th><th class="r">Equity</th><th class="r">Lots</th><th>Last trade</th><th class="r">Net deposits</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody>
         ${d.rows.map(a => { const [al, ac] = ACT[a.activity] || [a.activity, "var(--muted)"]; return `<tr><td class="mono"><b>${esc(a.login)}</b><small>${esc(a.server || "")}</small></td><td>${a.client ? `<a href="${C.href("client/" + a.client.id)}">${esc(a.client.name)}</a><small>${esc(a.client.country)}</small>` : "—"}</td><td>${esc(a.type_name)}<small>1:${esc(a.leverage)} · ${esc(a.currency)}</small></td>
+<<<<<<< HEAD
           <td class="num">${a.balance_at || a.kind === "demo" ? money(a.balance) : "—"}${a.balance_at ? `<small>${ago(a.balance_at)}</small>` : ""}</td><td class="num">${a.equity == null ? "—" : money(a.equity)}${a.margin_free != null ? `<small>free ${money(a.margin_free)}${a.positions_open ? " · " + a.positions_open + " open" : ""}</small>` : ""}</td><td class="num">${a.lots_total ? num(a.lots_total) : "—"}</td><td>${a.last_trade_at ? fDate(a.last_trade_at) : '<span class="muted">none recorded</span>'}</td>
           <td class="num">${money(a.net)}<small>in ${money(a.deposits)} · out ${money(a.withdrawals)}</small></td><td><span class="c-pill plain" style="--c:${ac}">${esc(al)}</span></td><td>${esc(a.owner_name)}</td>
           <td class="r">${can && a.kind === "live" && !a.trading_started_at ? `<button class="c-btn sm" data-tr="${esc(a.id)}">Mark trading</button>` : ""}</td></tr>`; }).join("")}
         </tbody></table></div>${d.rows.length ? "" : '<div class="c-empty"><b>No accounts</b></div>'}</div>
         <p class="muted" style="font-size:12.5px">${(meta().mt5 || {}).mode === "api" ? "Balances, equity, lots and the last trade are read from MT5 every few minutes (closed deals count towards lots)." : "There's no live MT5 connection: trading activity comes from the daily trading-data import (lots, last trade, or equity different from balance), or operations marks it here."}</p>`;
+=======
+          <td class="num">${a.balance_at || a.kind === "demo" ? money(a.balance) : "—"}${a.balance_at ? `<small>${ago(a.balance_at)}</small>` : ""}</td><td class="num">${a.equity == null ? "—" : money(a.equity)}</td><td class="num">${a.lots_total ? num(a.lots_total) : "—"}</td><td>${a.last_trade_at ? fDate(a.last_trade_at) : '<span class="muted">none recorded</span>'}</td>
+          <td class="num">${money(a.net)}<small>in ${money(a.deposits)} · out ${money(a.withdrawals)}</small></td><td><span class="c-pill plain" style="--c:${ac}">${esc(al)}</span></td><td>${esc(a.owner_name)}</td>
+          <td class="r">${can && a.kind === "live" && !a.trading_started_at ? `<button class="c-btn sm" data-tr="${esc(a.id)}">Mark trading</button>` : ""}</td></tr>`; }).join("")}
+        </tbody></table></div>${d.rows.length ? "" : '<div class="c-empty"><b>No accounts</b></div>'}</div>
+        <p class="muted" style="font-size:12.5px">There's no live MT5 connection: trading activity comes from the daily trading-data import (lots, last trade, or equity different from balance), or operations marks it here.</p>`;
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
       const go = patch => C.go("trading", Object.assign({}, p, patch));
       $$("[data-a]").forEach(b => b.addEventListener("click", () => go({ activity: b.dataset.a })));
       $("#tQ").addEventListener("input", C.debounce(e => go({ q: e.target.value.trim() }), 400)); $("#tK").addEventListener("change", e => go({ kind: e.target.value, activity: "" }));

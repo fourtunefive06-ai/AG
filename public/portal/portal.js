@@ -38,7 +38,11 @@
     home: I('<path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>'), acc: I('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M7 14l3-3 3 2 4-5"/>'),
     dep: I('<path d="M12 4v12M6 10l6 6 6-6"/><path d="M4 20h16"/>'), wd: I('<path d="M12 20V8M6 14l6-6 6 6"/><path d="M4 4h16"/>'), tr: I('<path d="M4 8h14l-4-4M20 16H6l4 4"/>'),
     hist: I('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>'), doc: I('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 14h8M8 18h5"/>'),
+<<<<<<< HEAD
     user: I('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'), ptn: I('<circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20a5.5 5.5 0 0 1 11 0M13.5 19a4 4 0 0 1 8 0"/>'), help: I('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/>'),
+=======
+    user: I('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'), help: I('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01"/>'),
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   };
   const NAV = [["home", "Dashboard", "home"], ["accounts", "Accounts", "acc"], ["deposit", "Deposit", "dep"], ["withdraw", "Withdraw", "wd"], ["transfer", "Transfer", "tr"], ["history", "Transactions", "hist"], ["documents", "Documents", "doc"], ["profile", "Profile & security", "user"], ["support", "Help", "help"]];
   const TABS = ["home", "accounts", "deposit", "history", "profile"];
@@ -82,11 +86,19 @@
       rd.readAsDataURL(file);
     });
   }
+<<<<<<< HEAD
   const ST = { mt5_sending: ["Processing", "var(--cta)"], mt5_unknown: ["Processing", "var(--cta)"], mt5_partial: ["Processing", "var(--cta)"], debited: ["Approved, sending", "var(--cta)"], paid: ["Received, crediting", "var(--cta)"], pending: ["Waiting", "var(--warn)"], first_approved: ["Being approved", "var(--warn)"], approved: ["Approved, sending", "var(--cta)"], completed: ["Done", "var(--up)"], rejected: ["Declined", "var(--down)"], cancelled: ["Cancelled", "var(--muted)"], requested: ["Being opened", "var(--warn)"], open: ["Active", "var(--up)"], closed: ["Closed", "var(--muted)"] };
   const pill = s => { const [l, c] = ST[s] || [s, "var(--muted)"]; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
   const KYC = { none: ["Not uploaded", "var(--muted)"], pending: ["Under review", "var(--warn)"], approved: ["Verified", "var(--up)"], rejected: ["Not accepted", "var(--down)"], resubmit: ["New documents needed", "var(--down)"] };
   const kycPill = s => { const [l, c] = KYC[s] || KYC.none; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
   const TYPE = { deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer", ib_payout: "Partner payout" };
+=======
+  const ST = { paid: ["Received, crediting", "var(--cta)"], pending: ["Waiting", "var(--warn)"], first_approved: ["Being approved", "var(--warn)"], approved: ["Approved, sending", "var(--cta)"], completed: ["Done", "var(--up)"], rejected: ["Declined", "var(--down)"], cancelled: ["Cancelled", "var(--muted)"], requested: ["Being opened", "var(--warn)"], open: ["Active", "var(--up)"], closed: ["Closed", "var(--muted)"] };
+  const pill = s => { const [l, c] = ST[s] || [s, "var(--muted)"]; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
+  const KYC = { none: ["Not uploaded", "var(--muted)"], pending: ["Under review", "var(--warn)"], approved: ["Verified", "var(--up)"], rejected: ["Not accepted", "var(--down)"], resubmit: ["New documents needed", "var(--down)"] };
+  const kycPill = s => { const [l, c] = KYC[s] || KYC.none; return `<span class="pill" style="--c:${c}">${esc(l)}</span>`; };
+  const TYPE = { deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer" };
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
   /* ------------------------------------------------------------- attribution */
   // First touch wins for 30 days: campaign links, the website's stored campaign, or a referral code
@@ -103,6 +115,7 @@
   }
   const attribution = () => { const a = ls.get("ag_attr") || {}, o = {}; ATTR_KEYS.forEach(k => { if (a[k]) o[k] = a[k]; }); return o; };
   captureAttribution();
+<<<<<<< HEAD
   // Partner (IB) code from a referral link: first touch, kept for 90 days
   (function captureIb() {
     let code = ""; try { code = new URLSearchParams(location.search).get("ib") || new URLSearchParams(location.hash.split("?")[1] || "").get("ib") || (ss("ag_utm") || {}).ib || ""; } catch (e) {}
@@ -110,6 +123,8 @@
     if (code && !(old && old.t > Date.now() - 90 * 864e5)) ls.set("ag_ib", { code, t: Date.now() });
   })();
   const ibCode = () => { const o = ls.get("ag_ib"); return o && o.t > Date.now() - 90 * 864e5 ? o.code : ""; };
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
 
   /* ------------------------------------------------------------- routing */
   function parse() { const h = location.hash.replace(/^#\/?/, ""); const [path, qs] = h.split("?"); return { path: path || "", q: Object.fromEntries(new URLSearchParams(qs || "")) }; }
@@ -157,7 +172,10 @@
           ${fld("Country of residence", sel("country", [["", "Select"]].concat(COUNTRIES.map(c => c[0])), "", 'id="rC" autocomplete="country-name"'), "full")}
           <label class="fld full"><span>Mobile number</span><div class="phone">${inp("dial_code", "+", 'id="rD" aria-label="Dial code" autocomplete="tel-country-code"')}${inp("phone", "", 'type="tel" autocomplete="tel-national" aria-label="Phone number"')}</div></label>
           ${fld("Password (10+ characters, letters and numbers)", inp("password", "", 'type="password" autocomplete="new-password"'), "full")}
+<<<<<<< HEAD
           ${fld("Partner code (optional)", inp("ib", ibCode(), 'autocomplete="off" maxlength="12" style="text-transform:uppercase"'), "full")}
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
           <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
           <label class="check full"><input type="checkbox" name="terms"><span>I confirm I'm 18 or older and accept the client agreement, privacy policy and risk disclosure. I understand that CFDs are high-risk leveraged products.</span></label>
           <p class="form-err full" hidden></p>
@@ -209,7 +227,11 @@
     const me = S.me, c = me.client, cur = r.path.split("/")[0];
     root.innerHTML = `<div class="app">
       <nav class="side" aria-label="Client area"><a class="logo" href="#home"><img src="/assets/absel-global-logo-white.png" alt="Absel Global" width="109" height="46"></a>
+<<<<<<< HEAD
         ${NAV.concat(me.ib && me.ib.status !== "none" ? [["partner", "Partner", "ptn"]] : []).map(([k, l, ic]) => `<a class="nv ${cur === k ? "on" : ""}" href="#${k}">${IC[ic]}<span>${l}</span></a>`).join("")}
+=======
+        ${NAV.map(([k, l, ic]) => `<a class="nv ${cur === k ? "on" : ""}" href="#${k}">${IC[ic]}<span>${l}</span></a>`).join("")}
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
         ${standalone() ? "" : `<a class="nv" href="#install" id="instSide" role="button">${I('<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 8v7M9 12l3 3 3-3"/>')}<span>Install the app</span></a>`}
         <div class="me"><b>${esc(c.first_name)} ${esc(c.last_name)}</b>${esc(c.email)}<br><button id="out">Sign out</button></div></nav>
       <div class="main"><header class="top"><img class="tlogo" src="/assets/absel-global-logo-white.png" alt="Absel Global" width="85" height="36"><h1 id="ttl"></h1><span class="sp"></span><a class="btn sm pri" href="#deposit">${IC.dep.replace("<svg", '<svg width="16" height="16"')} Deposit</a></header>
@@ -252,7 +274,10 @@
           <section class="card"><h3>Recent transactions <span class="sp"></span><a class="btn sm" href="#history">All</a></h3>${recent.length ? `<div class="list">${recent.map(txRow).join("")}</div>` : '<div class="empty">No transactions yet.</div>'}</section>
         </div><div style="display:grid;gap:20px">
           ${me.bonus && ["credited", "traded"].includes(me.bonus.status) ? `<section class="card"><h3>$${me.bonus.amount} funded account</h3><p class="muted" style="font-size:14px">Trade it live. Profit can be withdrawn after ${me.bonus.min_lots} lots, up to $${me.bonus.max_profit}. The $${me.bonus.amount} itself can't be withdrawn.</p><div class="acc" style="margin-top:12px"><dl><div><dt>Account</dt><dd>${esc(me.bonus.account_id)}</dd></div><div><dt>Lots</dt><dd>${me.bonus.lots} / ${me.bonus.min_lots}</dd></div><div><dt>Profit</dt><dd>${money(me.bonus.profit)}</dd></div><div><dt>Ends</dt><dd>${fDate(me.bonus.expires_at)}</dd></div></dl></div></section>` : ""}
+<<<<<<< HEAD
           ${partnerCard(me)}
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
           ${me.manager ? `<section class="card"><h3>Your account manager</h3><div class="mgr"><div class="av">${esc(me.manager.name.split(" ").map(x => x[0]).join("").slice(0, 2))}</div><div><b>${esc(me.manager.name)}</b><br><span class="muted" style="font-size:13px">${esc(me.manager.email || "")}</span></div></div><div class="row" style="margin-top:12px">${me.manager.phone ? `<a class="btn sm" href="https://wa.me/${esc(me.manager.phone.replace(/\D/g, ""))}" target="_blank" rel="noopener">WhatsApp</a><a class="btn sm" href="tel:${esc(me.manager.phone.replace(/[^\d+]/g, ""))}">Call</a>` : ""}${me.manager.email ? `<a class="btn sm" href="mailto:${esc(me.manager.email)}">Email</a>` : ""}</div></section>` : ""}
           <section class="card"><h3>Download MetaTrader 5</h3><p class="muted" style="font-size:14px">Sign in with the login and server shown on your account.</p><div class="dl" style="margin-top:12px">${platformLinks()}</div></section>
         </div></div>`;
@@ -436,6 +461,7 @@
       $$("[data-pay]").forEach(b => b.addEventListener("click", () => payModal(rows.find(x => x.id === b.dataset.pay))));
     },
   };
+<<<<<<< HEAD
   /* ------------------------------------------------------------- Partner (IB) section: the same login, clients shown masked */
   function partnerCard(me) {
     const ib = me.ib || {};
@@ -564,6 +590,8 @@
     });
   }
 
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
   VIEWS.documents = {
     title: "Documents",
     render(pg) {

@@ -2,4 +2,7 @@ node_modules
 .env
 db/*.db
 db/*.db-*
+<<<<<<< HEAD
 db/*.jsonl
+=======
+>>>>>>> 3d0b0f61d47bc139cb59d499942b38aeb9987b00
