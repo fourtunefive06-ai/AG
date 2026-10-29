@@ -82,5 +82,18 @@ try {
   ok(store.all("commissions").filter(l => l.payout_id === p.id).every(l => l.status === "paid"), "commission lines paid");
   ok(crm.getPartner(PT, pt0.id).audit.some(a => a.action === "payout_paid"), "payout in the partner's audit trail");
   ok(crm.mt5Reconcile(OPS, { from: new Date(T - 864e5).toISOString().slice(0, 10), to: new Date(T + 864e5).toISOString().slice(0, 10) }).rows.find(r => r.login === ib.acc.login).matched === 1, "reconciliation matches the IB payout");
-  console.log(`✔ IB chain: ${passed} checks passed (MT5 deal → commission → month approval → payout request → credited by hand in MT5 Manager → matched → confirmed with the deal ticket)`);
+  // a deal that MT5 no longer returns on the next sync: kept, marked missing, its commission reversed (never deleted)
+  const t2 = Math.floor(T / 1000) + 60;
+  await set({ deals: [
+    { Deal: 7901, Login: Number(cl.acc.login), Time: t2, TimeMsc: t2 * 1000, Action: 0, Entry: 0, Symbol: "EURUSD", Volume: 20000, PositionID: 93 },
+    { Deal: 7902, Login: Number(cl.acc.login), Time: t2 + 540, TimeMsc: (t2 + 540) * 1000, Action: 1, Entry: 1, Symbol: "EURUSD", Volume: 20000, Profit: 5, PositionID: 93 },
+  ] });
+  T += 3600e3; await runSync(ctx);
+  ok(store.get("commissions", "CM1_7902_" + pt0.id).status === "pending" && store.get("commissions", "CM1_7902_" + pt0.id).amount === 10, "new closing deal: 2 lots forex × $5 = $10 pending");
+  mock.state.deals.splice(mock.state.deals.findIndex(d => d.Deal === 7902), 1);
+  const r3 = await runSync(ctx);
+  ok(r3.deals.missing === 1 && store.get("mt5_deals", "MD7902").missing_at && store.get("commissions", "CM1_7902_" + pt0.id).status === "reversed" && /no longer in MT5/.test(store.get("commissions", "CM1_7902_" + pt0.id).reversed_reason), "deal gone from MT5 on re-sync: kept, marked missing, its line reversed with the reason");
+  ok(!store.get("mt5_deals", "MD7901").missing_at && store.get("mt5_deals", "MD7801") && !store.get("mt5_deals", "MD7801").missing_at, "deals still in MT5 are untouched");
+  const r4 = await runSync(ctx); ok(r4.deals.missing === 0 && store.all("commissions").filter(l => l.deal_ticket === "7902").length === 1, "re-sync: nothing new, no duplicate");
+  console.log(`✔ IB chain: ${passed} checks passed (MT5 deal → commission → month approval → payout request → credited by hand in MT5 Manager → matched → confirmed with the deal ticket; a deal removed in MT5 reverses its commission)`);
 } finally { mt5.reset(); await mock.close(); }

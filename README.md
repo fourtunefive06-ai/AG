@@ -167,7 +167,7 @@ Clients become **partners (IBs)** with the same client-area login. Commission is
 - If the IB has an approved master, a level 2 line goes to the master at its plan's override.
 - **Held** with a reason: trades closed in under the plan's minimum (default 2 minutes); trading on the IB's or the master's own account; a client sharing a sign-up or login IP, or payout details, with the IB (flagged to partnerships).
 - **CPA** (optional per plan): one line when the first deposit is at least the minimum, KYC is approved, and the client trades the minimum lots within the window. It's held for the holdback period, then becomes payable if the first deposit wasn't charged back or withdrawn.
-- A chargeback (recorded by operations on the client page) or a deal changed in MT5 **reverses** lines. Lines are never deleted. One line per partner, level and deal, so a re-sync never duplicates.
+- A chargeback (recorded by operations on the client page), a deal changed in MT5, or a deal MT5 no longer returns on the next sync (kept and marked missing, with an alert) **reverses** lines. A line already in an open payout isn't reversed by the sync; the partnerships team is told instead. Lines are never deleted. One line per partner, level and deal, so a re-sync never duplicates.
 - A suspended partner gets no new clients and no new lines. Approved commission can still be paid.
 
 **Month close and payouts.**
