@@ -312,7 +312,7 @@
     const sub = isTablet() ? false : !prefs().collapsed;
     curHub = "";
     $("#crm").innerHTML = `<div class="c-shell${sub ? "" : " collapsed"}" id="cShell">
-      <nav class="c-rail" aria-label="Main areas"><a class="c-rlogo" href="${C.href(home())}" data-hub="home" aria-label="Absel Global back office: home"><img src="/assets/favicon-64.png" alt="" width="34" height="34"></a>
+      <nav class="c-rail" aria-label="Main areas"><a class="c-rlogo" href="${C.href(home())}" data-hub="home" aria-label="Absel Global back office: home"><img src="/assets/logo-rail.png" alt="" width="56" height="56"></a>
         <div class="c-hubs" id="cHubs"></div><div class="c-pins" id="cPins"></div><span class="sp"></span>
         <div class="c-rbot"><button type="button" class="c-hub" data-act="tools" title="All tools (G then A)"><span class="ic">${ICONS.apps}</span><span class="lb">All tools</span></button><span id="cRset"></span>
           <div class="c-relt"><button type="button" class="c-hub" id="cHelpR" data-act="help" aria-label="Help and keyboard shortcuts" title="Help"><span class="ic">${ICONS.help}</span><span class="lb">Help</span></button></div>
