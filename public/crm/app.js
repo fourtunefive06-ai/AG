@@ -312,7 +312,7 @@
     const sub = isTablet() ? false : !prefs().collapsed;
     curHub = "";
     $("#crm").innerHTML = `<div class="c-shell${sub ? "" : " collapsed"}" id="cShell">
-      <nav class="c-rail" aria-label="Main areas"><a class="c-rlogo" href="${C.href(home())}" data-hub="home" aria-label="Absel Global back office: home"><img src="/assets/logo-rail.png" alt="" width="56" height="56"></a>
+      <nav class="c-rail" aria-label="Main areas"><a class="c-rlogo" href="${C.href(home())}" data-hub="home" aria-label="Absel Global back office: home"><img src="/assets/logo-rail.png?v=2" alt="" width="44" height="44"></a>
         <div class="c-hubs" id="cHubs"></div><div class="c-pins" id="cPins"></div><span class="sp"></span>
         <div class="c-rbot"><button type="button" class="c-hub" data-act="tools" title="All tools (G then A)"><span class="ic">${ICONS.apps}</span><span class="lb">All tools</span></button><span id="cRset"></span>
           <div class="c-relt"><button type="button" class="c-hub" id="cHelpR" data-act="help" aria-label="Help and keyboard shortcuts" title="Help"><span class="ic">${ICONS.help}</span><span class="lb">Help</span></button></div>
@@ -592,7 +592,7 @@
     const host = $("#cBell").parentElement, p = document.createElement("div"); p.className = "c-pop"; p.id = "cNotif"; p.innerHTML = '<p class="muted" style="padding:14px">Loading…</p>'; host.appendChild(p);
     try {
       const list = await API.call("listNotifications");
-      p.innerHTML = `<div class="c-row" style="padding:10px 14px;border-bottom:1px solid var(--line)"><b>Notifications</b><span class="sp"></span><button class="c-btn sm" id="cReadAll">Mark all read</button></div>` + (list.length ? list.map(n => `<button class="it ${n.read ? "" : "unread"}" data-lead="${esc(n.lead_id || "")}" data-id="${esc(n.id)}">${esc(n.text)}<small>${ago(n.created_at)}</small></button>`).join("") : '<p class="muted" style="padding:14px">Nothing yet.</p>');
+      p.innerHTML = `<div class="c-row c-pophd"><b>Notifications</b><span class="sp"></span><button class="c-btn sm" id="cReadAll">Mark all read</button></div>` + (list.length ? list.map(n => `<button class="it ${n.read ? "" : "unread"}" data-lead="${esc(n.lead_id || "")}" data-id="${esc(n.id)}">${esc(n.text)}<small>${ago(n.created_at)}</small></button>`).join("") : '<p class="muted" style="padding:14px">Nothing yet.</p>');
       $("#cReadAll", p).addEventListener("click", async ev => { ev.stopPropagation(); await API.call("markRead"); closePops(); setUnread(0); });
       $$(".it", p).forEach(b => b.addEventListener("click", async () => { closePops(); API.call("markRead", [b.dataset.id]).then(updateBadges); if (b.dataset.lead) C.go("lead/" + b.dataset.lead); }));
     } catch (err) { p.innerHTML = `<p style="padding:14px">${esc(err.message)}</p>`; }
