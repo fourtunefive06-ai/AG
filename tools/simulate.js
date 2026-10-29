@@ -553,65 +553,61 @@ console.log("✔ all checks passed");
   // operations links the unknown login to a client
   const cl = store.get("clients", acc.client_id); crm.mt5LinkAccount(OPS, "UL7900001", { client_id: cl.id, type: "stp" });
   assert(store.all("accounts").some(a => a.login === "7900001" && a.client_id === cl.id) && store.get("mt5_deals", "MD800005").client_id === cl.id, "linked by operations; its deals follow");
-  assert.strictEqual(crm.getSettings().mt5.writes_enabled, false, "MT5 writes are off by default");
+  assert(!(crm.getSettings().mt5 || {}).account_creation_enabled && !("writes_enabled" in (crm.getSettings().mt5 || {})), "MT5 account creation is off by default; there is no MT5 money switch");
   console.log("MT5 sync:", { deals: store.size("mt5_deals"), reconciled_logins: rec.rows.length, outside: rec.totals.outside });
 }
 
-/* ---------- MT5 actions after approval: the same core in api mode, MT5 answers fed in by hand (no network) ---------- */
+/* ---------- Phase B: our system never moves money in MT5. Operations does it in MT5 Manager with our reference in the comment;
+              the synced balance deals (fake MT5 rows here, no network) are matched, and a person confirms. ---------- */
 {
   const OPS = U.fatima, OPS2 = U.ali, iso = ms => new Date(ms).toISOString();
-  // manual mode (this simulation): MT5 actions are refused, the manual buttons stay
-  const anyPay = store.all("payments").find(p => p.type === "deposit");
-  assert.throws(() => crm.mt5PaymentAction(OPS, anyPay.id, "credit", {}), /manual mode/);
-  const api = createCRM({ store, now: () => new Date(T), mt5Mode: () => "api", random: n => new Uint8Array(require("crypto").randomBytes(n)), hashPassword: p => "x:" + p, verifyPassword: (p, h) => h === "x:" + p });
-  assert.throws(() => api.mt5PaymentAction(OPS, anyPay.id, "credit", {}), /switched off/, "writes are off by default");
-  api.saveSettings(ADMIN, { mt5: { writes_enabled: true } });
+  assert(!crm.mt5PaymentAction && !crm.mt5BonusCredit && !crm.mt5SettleFromDeals, "no MT5 money function in the core");
   const acc = store.all("accounts").filter(a => a.kind === "live" && a.status === "open" && /^71/.test(a.login)).sort((a, b) => a.login.localeCompare(b.login))[1];
   const x = store.get("clients", acc.client_id), C = { id: x.id };
-  // deposit: approve and credit → MT5 deal recorded → completed (deal ticket, approver)
+  // manual mode (this simulation): no matching, today's flow unchanged
+  const m0 = crm.portalDeposit(C, { account_id: acc.id, method: "bank", amount: 200 });
+  assert.strictEqual(crm.listPayments(OPS, { status: "open" }).find(p => p.id === m0.id).mt5_match, null, "manual mode: no MT5 matching");
+  crm.decidePayment(OPS, m0.id, "complete", { reference: "BANK-M0" }); assert.strictEqual(store.get("payments", m0.id).status, "completed", "manual mode: confirmed as today");
+  const api = createCRM({ store, now: () => new Date(T), mt5Mode: () => "api", random: n => new Uint8Array(require("crypto").randomBytes(n)), hashPassword: p => "x:" + p, verifyPassword: (p, h) => h === "x:" + p });
+  let tk = 991000; const deal = (login, amount, comment) => ({ ticket: String(++tk), login, time: iso(T), action: 2, profit: amount, comment });
+  const match = id => api.listPayments(OPS, { status: "open" }).find(p => p.id === id).mt5_match;
+  // deposit: credited in MT5 Manager with DEP <reference> → seen in MT5 → one click
   const dp = crm.portalDeposit(C, { account_id: acc.id, method: "bank", amount: 400 });
-  assert.throws(() => api.mt5PaymentAction(U.sara, dp.id, "credit", {}), /operations/, "no MT5 credit without an operations approval");
-  const c1 = api.mt5PaymentAction(OPS, dp.id, "credit", { reference: "BANK-9" });
-  assert(c1.op.comment === "DEP " + dp.reference && c1.op.amount === 400 && c1.op.approval.by === OPS.id && c1.op.approval.payment_id === dp.id && store.get("payments", dp.id).status === "mt5_sending");
-  api.mt5OpResult(c1.op.op_id, { ok: true, ticket: "990001", retcode: "0 Done" });
-  const p1 = store.get("payments", dp.id); assert(p1.status === "completed" && p1.ext_reference === "MT5 deal #990001 · BANK-9" && p1.completed_by === OPS.id, "credited in MT5");
-  // timeout → unknown → the sync brings the deal with our comment → completed, nothing sent twice
-  const dp2 = crm.portalDeposit(C, { account_id: acc.id, method: "bank", amount: 150 }), c2 = api.mt5PaymentAction(OPS, dp2.id, "credit", { reference: "BANK-10" });
-  api.mt5OpResult(c2.op.op_id, { ok: false, unknown: true, error: "MT5 didn't answer within 20s" });
-  assert.strictEqual(store.get("payments", dp2.id).status, "mt5_unknown");
-  assert.throws(() => api.mt5PaymentAction(OPS, dp2.id, "credit", {}), /still confirming/, "no blind retry");
-  assert.throws(() => crm.decidePayment(OPS, dp2.id, "complete", { reference: "x" }), /still confirming/);
-  api.mt5IngestDeals([{ ticket: "990002", login: acc.login, time: iso(T), action: 2, profit: 150, comment: "DEP " + dp2.reference }]);
-  assert(store.get("payments", dp2.id).status === "completed" && store.all("mt5_ops").some(o => o.payment_id === dp2.id && o.found_existing), "settled from the synced deal");
-  // a refused credit goes back with the error; the retry checks MT5 first
-  const dp3 = crm.portalDeposit(C, { account_id: acc.id, method: "bank", amount: 120 }), c3 = api.mt5PaymentAction(OPS, dp3.id, "credit", {});
-  api.mt5OpResult(c3.op.op_id, { ok: false, retcode: 10, error: "MT5 balance operation: 10 Server busy" });
-  assert(store.get("payments", dp3.id).status === "pending" && /Server busy/.test(store.get("payments", dp3.id).mt5_error));
-  const c3b = api.mt5PaymentAction(OPS, dp3.id, "credit", {}); assert(c3b.op.check_first, "retry looks in MT5 first");
-  api.mt5OpResult(c3b.op.op_id, { ok: true, ticket: "990009" }); assert.strictEqual(store.get("payments", dp3.id).status, "completed");
-  // withdrawal over the limit: two people, then debit → "Debited in MT5, pay the client" → Mark paid
+  api.mt5IngestDeals([deal(acc.login, 400, "DEP " + dp.reference)]);
+  assert.strictEqual(store.get("payments", dp.id).status, "pending", "a matched deal is never applied on its own");
+  let m = match(dp.id); assert(m.ok && m.tickets[0] === String(tk), "Seen in MT5");
+  assert.throws(() => api.decidePayment(U.sara, dp.id, "complete", { mt5_ticket: m.tickets[0] }), /operations/, "only operations confirms");
+  api.decidePayment(OPS, dp.id, "complete", { mt5_ticket: m.tickets[0] });
+  const p1 = store.get("payments", dp.id); assert(p1.status === "completed" && p1.ext_reference === "MT5 deal #" + tk && p1.completed_by === OPS.id && p1.mt5.matched, "confirmed: the deal ticket is the reference");
+  // the amount differs: flagged; confirming needs a reason
+  const dp2 = crm.portalDeposit(C, { account_id: acc.id, method: "bank", amount: 150 });
+  api.mt5IngestDeals([deal(acc.login, 140, "DEP " + dp2.reference)]);
+  assert.strictEqual(match(dp2.id).legs[0].state, "amount", "amount mismatch flagged");
+  assert.throws(() => api.decidePayment(OPS, dp2.id, "complete", { reference: "BANK-10" }), /Say why/, "no reason, no confirm");
+  api.decidePayment(OPS, dp2.id, "complete", { amount: 140, reference: "BANK-10", no_match_reason: "Bank fee of $10" });
+  assert(store.get("payments", dp2.id).status === "completed" && store.get("payments", dp2.id).mt5.reason === "Bank fee of $10", "confirmed with the reason logged");
+  // withdrawal over the limit: two people approve (as before); operations debits in MT5 Manager; Mark paid with the payout reference
   const lim = crm.getSettings().portal.second_approval_over, bal = store.get("accounts", acc.id); bal.balance = 5000; bal.balance_at = iso(T); store.put("accounts", bal);
   const wd = crm.portalWithdraw(C, { account_id: acc.id, method: "bank", amount: lim + 100, details: "IBAN KE00 1234" });
-  assert(!api.mt5PaymentAction(OPS, wd.id, "approve").op && store.get("payments", wd.id).status === "first_approved", "first approval: nothing sent");
-  const w2 = api.mt5PaymentAction(OPS2, wd.id, "approve"); assert(w2.op.amount === -(lim + 100) && w2.op.need_margin === lim + 100);
-  api.mt5OpResult(w2.op.op_id, { ok: true, ticket: "990003" }); assert.strictEqual(store.get("payments", wd.id).status, "debited");
-  assert.throws(() => crm.decidePayment(OPS, wd.id, "reject", { reason: "x" }), /already debited/);
-  crm.decidePayment(OPS, wd.id, "complete", { reference: "SWIFT-1" }); assert.strictEqual(store.get("payments", wd.id).status, "completed");
-  // insufficient free margin: the request stays approved with the reason
-  const wd2 = crm.portalWithdraw(C, { account_id: acc.id, method: "bank", amount: 60, details: "IBAN" }), w3 = api.mt5PaymentAction(OPS, wd2.id, "approve");
-  api.mt5OpResult(w3.op.op_id, { ok: false, margin: true, error: "Not enough free margin on " + acc.login + ": $10 free, $60 needed." });
-  assert(store.get("payments", wd2.id).status === "approved" && /free margin/.test(store.get("payments", wd2.id).mt5_error));
-  // transfer: credit fails after the debit → red alert, one-click retry, never reversed
+  api.decidePayment(OPS, wd.id, "approve"); assert.strictEqual(store.get("payments", wd.id).status, "first_approved");
+  api.decidePayment(OPS2, wd.id, "approve"); assert.strictEqual(store.get("payments", wd.id).status, "approved", "two approvals above the limit");
+  api.mt5IngestDeals([deal(acc.login, -(lim + 100), "WD " + wd.reference)]);
+  m = match(wd.id); assert(m.ok, "Debit seen in MT5");
+  assert.throws(() => api.decidePayment(OPS, wd.id, "complete", { mt5_ticket: m.tickets[0] }), /payout reference/);
+  api.decidePayment(OPS, wd.id, "complete", { mt5_ticket: m.tickets[0], reference: "SWIFT-1" }); assert.strictEqual(store.get("payments", wd.id).status, "completed");
+  // transfer: both sides matched
   const acc2 = store.all("accounts").find(a => a.client_id === x.id && a.kind === "live" && a.status === "open" && a.id !== acc.id) || (() => { const r = crm.portalRequestAccount(C, { type: "stp", leverage: 100 }); crm.openAccount(OPS, r.id, { login: "7199999" }); return store.get("accounts", r.id); })();
-  const tr = crm.portalTransfer(C, { account_id: acc.id, to_account_id: acc2.id, amount: 50 }), t1 = api.mt5PaymentAction(OPS, tr.id, "approve");
-  const t2 = api.mt5OpResult(t1.op.op_id, { ok: true, ticket: "990004" }); assert(t2.next && t2.next.comment === "TRF-IN " + tr.reference);
-  api.mt5OpResult(t2.next.op_id, { ok: false, error: "MT5 balance operation: 13 Not found" });
-  assert.strictEqual(store.get("payments", tr.id).status, "mt5_partial"); assert(store.all("notifications").some(n => n.user_id === OPS.id && /NOT credited/.test(n.text)), "red alert");
-  const t3 = api.mt5PaymentAction(OPS, tr.id, "retry_in"); assert(t3.op.check_first && t3.op.comment === "TRF-IN " + tr.reference);
-  api.mt5OpResult(t3.op.op_id, { ok: true, ticket: "990005" }); assert.strictEqual(store.get("payments", tr.id).status, "completed");
-  assert(store.all("mt5_ops").filter(o => o.payment_id === tr.id).map(o => o.status).join() === "done,failed,done", "every attempt in the ledger");
-  api.saveSettings(ADMIN, { mt5: { writes_enabled: false } });
-  console.log("MT5 actions:", { ledger: store.size("mt5_ops"), done: store.all("mt5_ops").filter(o => o.status === "done").length });
+  const tr = crm.portalTransfer(C, { account_id: acc.id, to_account_id: acc2.id, amount: 50 });
+  api.mt5IngestDeals([deal(acc.login, -50, "TRF-OUT " + tr.reference)]); assert(!match(tr.id).ok && match(tr.id).legs[1].state === "missing", "one side only: not confirmable yet");
+  api.mt5IngestDeals([deal(acc2.login, 50, "TRF-IN " + tr.reference)]); m = match(tr.id); assert(m.ok && m.tickets.length === 2, "both sides seen");
+  api.decidePayment(OPS, tr.id, "complete", { mt5_ticket: m.tickets.join(",") }); assert.strictEqual(store.get("payments", tr.id).status, "completed");
+  // two deals with one reference: flagged, none picked; a reference we don't know: counted for operations
+  const dp3 = crm.portalDeposit(C, { account_id: acc.id, method: "bank", amount: 120 });
+  api.mt5IngestDeals([deal(acc.login, 120, "DEP " + dp3.reference), deal(acc.login, 120, "DEP " + dp3.reference)]);
+  assert(match(dp3.id).legs[0].state === "duplicate" && !match(dp3.id).tickets.length, "duplicate reference flagged, none picked");
+  api.mt5IngestDeals([deal(acc.login, 75, "DEP D-ZZZZZZ")]); assert(api.opsOverview(OPS).mt5.unknown_refs >= 1, "unknown reference counted");
+  api.decidePayment(OPS, dp3.id, "reject", { reason: "Duplicate request" });
+  console.log("MT5 matching:", { confirmed: store.all("payments").filter(p => p.mt5 && p.mt5.matched).length, without_match: store.all("payments").filter(p => p.mt5 && p.mt5.matched === false).length });
 }
 
 /* ---------- IB / partner programme: 4 IBs (a master with 2 sub-IBs, 1 independent), referred clients at every stage,

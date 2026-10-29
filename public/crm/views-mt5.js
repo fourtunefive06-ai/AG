@@ -13,7 +13,7 @@
     const a = st.api || {}, sy = st.sync || {}, api = st.mode === "api";
     const pill = !api ? '<span class="c-pill plain">Manual mode</span>' : sy.failing_since ? '<span class="c-pill plain" style="--c:var(--down)">Sync failing</span>' : a.connected || sy.last_ok_at ? '<span class="c-pill plain" style="--c:var(--up)">Connected</span>' : '<span class="c-pill plain" style="--c:var(--warn)">Not connected yet</span>';
     const groups = (st.groups || []), found = sy.groups_found || [];
-    return `<div class="c-card" style="max-width:980px;overflow-wrap:anywhere" id="mt5Card"><div class="c-row"><b>MT5 Web API</b> ${pill}${api && st.writes_enabled ? ' <span class="c-pill plain" style="--c:var(--cta)">Writes on</span>' : ""}<span class="sp"></span>${api && isOps() ? `<button type="button" class="c-btn sm" id="mt5Sync">${st.syncing ? "Syncing…" : "Sync now"}</button>` : ""}</div>
+    return `<div class="c-card" style="max-width:980px;overflow-wrap:anywhere" id="mt5Card"><div class="c-row"><b>MT5 Web API</b> ${pill}${api && st.account_creation_enabled ? ' <span class="c-pill plain" style="--c:var(--cta)">Account creation on</span>' : ""}<span class="sp"></span>${api && isOps() ? `<button type="button" class="c-btn sm" id="mt5Sync">${st.syncing ? "Syncing…" : "Sync now"}</button>` : ""}</div>
       ${api ? `<dl class="c-dl" style="margin-top:8px"><dt>Server</dt><dd class="mono">${esc(a.server || "not set")}${a.manager ? " · manager " + esc(a.manager) : ""}${a.tls_insecure ? ' · <b style="color:var(--down)">certificate not checked</b>' : ""}</dd>
         <dt>Login range</dt><dd class="mono">${a.range_ok ? esc(a.range.from) + "–" + esc(a.range.to) : '<b style="color:var(--down)">not set (MT5_LOGIN_FROM / MT5_LOGIN_TO)</b>'}</dd>
         <dt>Last sync</dt><dd>${sy.last_ok_at ? fDT(sy.last_ok_at) + " (" + ago(sy.last_ok_at) + ")" : "never"}${a.sync_seconds ? " · every " + esc(a.sync_seconds) + "s" : ""}${sy.last_result ? ` · ${num(sy.last_result.accounts)} accounts, ${num(sy.last_result.deals_new)} new deals, ${num(sy.last_result.positions)} open positions` : ""}</dd>
@@ -23,6 +23,15 @@
         ${(st.alerts || []).length ? `<details style="margin-top:6px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Recent alerts (${st.alerts.length})</summary>${st.alerts.map(x => `<p style="font-size:12.5px">${fDT(x.at)} · ${esc(x.text)}</p>`).join("")}</details>` : ""}`
       : `<p class="muted" style="font-size:12.5px">MT5_MODE=manual: operations opens accounts and moves money in MT5 Manager and records it here, and balances come from the daily import. To connect, add the MT5_* values from Absel Markets to .env, check them with <span class="mono">node tools/mt5-check.js</span>, then set MT5_MODE=api and restart.</p>`}
       ${o.extra || ""}</div>`;
+  };
+  // Asks MT5 whether each configured group exists (group/get) and adds the answer to the status card
+  C.mt5GroupCheck = async page => {
+    const card = $("#mt5Card", page); if (!card) return;
+    const box = document.createElement("p"); box.style.cssText = "font-size:12.5px;margin-top:6px"; box.className = "muted"; box.textContent = "Checking the MT5 groups…"; card.appendChild(box);
+    try {
+      const r = await API.call("mt5GroupCheck");
+      box.innerHTML = r.groups.length ? "<b>Groups in MT5:</b> " + r.groups.map(g => `<span class="mono">${esc(g.group)}</span> <span style="color:${g.exists ? "var(--up)" : "var(--down)"}">${g.exists ? "✓ exists" : "✕ " + esc(g.error || "not found")}</span>`).join(" · ") : "No MT5 groups set yet: add them per account type below.";
+    } catch (e) { box.textContent = "Couldn't check the groups: " + e.message; }
   };
   C.wireMt5Card = (page, after) => {
     const b = $("#mt5Sync", page); if (!b) return;
@@ -81,7 +90,7 @@
           <td class="num"><b style="color:${x.diff ? "var(--down)" : "var(--up)"}">${x.diff ? money(x.diff) : "✓"}</b><small>${num(x.matched)} matched</small></td>
           <td style="font-size:12.5px">${x.ours_unmatched.map(o => `<div>⚠ <b class="mono">${esc(o.ref)}</b> ${esc(o.type)} ${money(o.amount)}: ${esc(o.why)}</div>`).join("")}${x.outside.map(o => `<div>⚠ MT5 deal <span class="mono">#${esc(o.ticket)}</span> ${money(o.amount)} ${fDT(o.time)}${o.comment ? " · “" + esc(o.comment) + "”" : ""}: made outside the system${o.possible ? ` (same amount as <b class="mono">${esc(o.possible)}</b>)` : ""}</div>`).join("")}</td></tr>`).join("")}
         </tbody></table></div>${rows.length ? "" : `<div class="c-empty"><b>${d.rows.length ? "No differences in this period" : "No money movements in this period"}</b></div>`}</div>
-        <p class="muted" style="font-size:12.5px">Each completed deposit, withdrawal and transfer is matched to an MT5 balance deal whose comment contains its reference (DEP, WD, TRF-OUT and TRF-IN followed by the reference). Balance deals without one of our references were made by hand in MT5 Manager: check them and record any missing request.</p>`;
+        <p class="muted" style="font-size:12.5px">Our system never moves money in MT5. Each completed deposit, withdrawal, transfer, partner payout and $100 account is matched to the MT5 balance deal operations made in MT5 Manager, by the reference in its comment (DEP, WD, TRF-OUT, TRF-IN, IB or BONUS followed by the reference). Balance deals without one of our references were made by hand in MT5 Manager: check them and record any missing request.</p>`;
       C.wireRange("mt5recon", p);
       $$("[data-only]").forEach(b => b.addEventListener("click", () => C.go("mt5recon", Object.assign({}, p, { only: b.dataset.only === "all" ? "all" : "" }))));
       $("#rcCsv").addEventListener("click", () => C.downloadCsv("absel-mt5-reconciliation-" + d.from + "-" + d.to, ["Login", "Client", "Ours in", "MT5 in", "Ours out", "MT5 out", "Difference", "Matched", "Not found in MT5", "Made outside"], d.rows.map(x => [x.login, x.client ? x.client.name : "", x.ours_in, x.mt5_in, x.ours_out, x.mt5_out, x.diff, x.matched, x.ours_unmatched.map(o => o.ref + " " + o.amount).join("; "), x.outside.map(o => "#" + o.ticket + " " + o.amount + " " + o.comment).join("; ")])));

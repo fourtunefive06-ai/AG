@@ -66,7 +66,9 @@ async function groupsFromDb() {
   const groups = process.argv.slice(2).length ? process.argv.slice(2) : await groupsFromDb();
   if (!groups.length) console.log("! No MT5 groups yet. Set them per account type in Client area settings (or pass them: node tools/mt5-check.js \"real\\\\absel-global\\\\ecn\").");
   for (const g of groups) {
-    try { const l = await mt5.listLogins(g); console.log(`✔ Group ${g}: ${l.logins.length} account(s) in our range${l.outside ? ` · ${l.outside} OUTSIDE the range (ignored; ask Absel Markets why)` : ""}`); }
+    try { await mt5.getGroup(g); } // group/get: does it exist for this manager?
+    catch (e) { console.error(`✖ Group ${g} not found or not allowed:`, e.message, "\n ", /13 |not found/i.test(e.message) ? "Check the name exactly as in MT5 (back-slashes included) in Client area settings, or ask Absel Markets for the right group name." : hint(e, c)); continue; }
+    try { const l = await mt5.listLogins(g); console.log(`✔ Group ${g} exists: ${l.logins.length} account(s) in our range${l.outside ? ` · ${l.outside} OUTSIDE the range (ignored; ask Absel Markets why)` : ""}`); }
     catch (e) { console.error(`✖ Group ${g}:`, e.message, "\n ", hint(e, c)); }
   }
   // 5. deals in the last 7 days

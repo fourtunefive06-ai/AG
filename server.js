@@ -297,18 +297,25 @@ const ASYNC_RPC = {
     if (!r.ok) throw new CrmError("The phone system refused the call (" + r.status + "). Dial manually for now.");
     return { mode: "click", number: info.number, extension: info.extension };
   },
-  // MT5 actions after approval (api mode with MT5 actions switched on). The core records the approval and the operation;
-  // here it is sent to MT5 and the result recorded. A failure leaves a visible error on the request.
-  async mt5Payment(u, id, action, d) { const r = store.transaction(() => crm.mt5PaymentAction(u, id, action, d || {})); return mt5Run(r.op, r.payment, "payment"); },
-  async mt5CreateAccount(u, id) { const r = store.transaction(() => crm.mt5AccountCreate(u, id)); return mt5Run(r.op, r.account, "account"); },
-  async mt5Leverage(u, id, lev) { const r = store.transaction(() => crm.mt5Leverage(u, id, lev)); return mt5Run(r.op, r.account, "account"); },
-  async mt5BonusCredit(u, id, p) { const r = store.transaction(() => crm.mt5BonusCredit(u, id, p || {})); return mt5Run(r.op, r.bonus, "bonus"); },
-  async mt5Check(u, id) { const op = store.transaction(() => crm.mt5OpToCheck(u, id)); return mt5Run(op, null, "payment"); },
+  // MT5 account actions (api mode with MT5 account creation switched on): the core prepares the action, here it is sent to MT5
+  // and the result recorded. A failure leaves a visible error. Our system never moves money in MT5: deposits, withdrawals,
+  // transfers, bonuses and partner payouts are done in MT5 Manager and only matched here (decidePayment / decideBonus).
+  async mt5CreateAccount(u, id) { const r = store.transaction(() => crm.mt5AccountCreate(u, id)); return mt5Run(r.op, r.account, "account", u); },
+  async mt5Leverage(u, id, lev) { const r = store.transaction(() => crm.mt5Leverage(u, id, lev)); return mt5Run(r.op, r.account, "account", u); },
+  async mt5Check(u, id) { const op = store.transaction(() => crm.mt5OpToCheck(u, id)); return mt5Run(op, null, "account", u); },
   // Operations: read MT5 now instead of waiting for the timer
+  // Settings card: does each MT5 group in Client area settings exist? (group/get, cached for a minute)
+  async mt5GroupCheck(u) {
+    const st = crm.mt5Status(u); if (mt5.cfg().mode !== "api" || !mt5.configured()) return { at: null, groups: [] };
+    if (mt5GroupCache && Date.now() - mt5GroupCache.ms < 60000) return mt5GroupCache;
+    const groups = [];
+    for (const g of st.groups) { try { await mt5.getGroup(g.group); groups.push(Object.assign({}, g, { exists: true })); } catch (e) { groups.push(Object.assign({}, g, { exists: false, error: /13 |not found/i.test(e.message) ? "Not found in MT5" : e.message })); } }
+    mt5LogFlush(u); mt5GroupCache = { ms: Date.now(), at: new Date().toISOString(), groups }; return mt5GroupCache;
+  },
   async mt5SyncNow(u) {
     crm.mt5Status(u); if (!["admin", "operations"].includes(u.role)) throw new CrmError("Only operations can do this.", 403);
     if (mt5.cfg().mode !== "api") throw new CrmError("MT5 is in manual mode (MT5_MODE=manual in .env).");
-    try { const r = await mt5Sync(); drainQueue(); return r; } catch (e) { throw new CrmError("MT5 sync failed: " + e.message); }
+    try { const r = await mt5Sync(u); drainQueue(); return r; } catch (e) { throw new CrmError("MT5 sync failed: " + e.message); }
   },
   async sendMisNow(u) {
     if (u.role !== "admin") throw new CrmError("Only admins can do this.", 403);
@@ -506,24 +513,34 @@ async function cyrafaWebhook(req, res) {
 }
 /* ----------------------------------------------------------- MT5 Web API */
 // Read-only sync every MT5_SYNC_SECONDS in api mode: balances, deals, open positions. One run at a time.
-let mt5Syncing = false;
-async function mt5Sync() {
-  if (mt5Syncing) throw new Error("A sync is already running");
-  mt5Syncing = true;
-  try { return await mt5RunSync({ mt5, crm, store }); } finally { mt5Syncing = false; }
+let mt5Syncing = false, mt5GroupCache = null;
+// Every MT5 call goes to the mt5_ops log (command, parameters without secrets, retcode, who, when). Calls are collected
+// here and written after each sync or action; the keep-alive pings go with the next sync.
+let mt5Calls = [];
+mt5.setLog(c => { if (mt5Calls.length < 2000) mt5Calls.push(c); });
+function mt5LogFlush(by, opId) {
+  const calls = mt5Calls; mt5Calls = [];
+  if (calls.length) try { store.transaction(() => crm.mt5LogCalls(calls, by, opId)); } catch (e) { console.error("MT5 call log:", e.message); }
 }
-async function mt5Run(op, before, key) {
+async function mt5Sync(by) {
+  if (mt5Syncing) throw new Error("A sync is already running");
+  mt5Syncing = true; mt5LogFlush(null);
+  try { return await mt5RunSync({ mt5, crm, store }); } finally { mt5Syncing = false; mt5LogFlush(by || null); }
+}
+async function mt5Run(op, before, key, by) {
   if (!op) return { ok: true, [key]: before };
   let r;
   try { r = await mt5Actions.execute({ mt5, crm, store }, op); }
   catch (e) { console.error("MT5 action:", e.message); throw new CrmError("Something went wrong while talking to MT5: " + e.message + ". Use “Check MT5 again” before retrying."); }
-  finally { drainQueue(); }
+  finally { mt5LogFlush(by || null, op.op_id); drainQueue(); }
   const out = r || {}, err = out.op && out.op.status !== "done" ? out.op.error : null;
-  return { ok: !!out.ok, found: out.checked ? false : undefined, error: err, unknown: !!(out.op && out.op.status === "unknown"), ticket: out.op && out.op.ticket, payment: out.payment, account: out.account, bonus: out.bonus, [key]: out[key] || before };
+  return { ok: !!out.ok, found: out.checked ? false : undefined, error: err, unknown: !!(out.op && out.op.status === "unknown"), account: out.account, [key]: out[key] || before };
 }
-// Demo accounts are opened in MT5 straight away (no money involved), when MT5 actions are on
+// Demo accounts are approved straight away (same function as the Approve button) when MT5 account creation and
+// "Approve demo accounts automatically" are both on. Their starting balance is the MT5 demo group's own setting: our
+// system never deposits into them.
 async function autoDemo(acc) {
-  if (!acc || acc.kind !== "demo" || mt5.cfg().mode !== "api" || !(crm.getSettings().mt5 || {}).writes_enabled) return acc;
+  if (!acc || acc.kind !== "demo" || mt5.cfg().mode !== "api" || !crm.mt5AutoDemo()) return acc;
   try { const r = store.transaction(() => crm.mt5AccountCreate(crm.SYSTEM, acc.id)); const out = await mt5Run(r.op, r.account, "account"); return out.account || acc; }
   catch (e) { console.error("Demo account in MT5:", e.message); return acc; }
 }
@@ -533,6 +550,8 @@ function startMt5() {
   mt5.setAlert(msg => { try { store.transaction(() => crm.mt5Alert(msg)); } catch (e) { console.error("MT5 alert:", e.message); } });
   if (!mt5.configured()) { console.error("✖ MT5_MODE=api but MT5_SERVER, MT5_MANAGER_LOGIN or MT5_WEBAPI_PASSWORD is missing. Run: node tools/mt5-check.js"); return; }
   mt5.keepAlive();
+  // requests left "Being opened" when the server last stopped: look for them in MT5 (by comment) before anything else
+  setTimeout(async () => { for (const op of crm.mt5StuckCreations()) { try { await mt5Run(op, null, "account"); } catch (e) { console.error("MT5 check of", op.account_id, e.message); } } }, 8000).unref();
   const run = () => { if (!mt5Syncing) mt5Sync().then(() => drainQueue(), e => console.error("MT5 sync:", e.message)); };
   setTimeout(run, 5000).unref();
   setInterval(run, c.syncSeconds * 1000).unref();

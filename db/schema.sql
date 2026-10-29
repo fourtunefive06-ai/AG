@@ -8,7 +8,7 @@
 --   callevents (phone system events and recordings), campaigns, spend (ad spend per day), broadcasts, bonuses (company-funded accounts),
 --   clients (client-area accounts), accounts (MT5 accounts), payments (deposits, withdrawals, transfers incl. card/crypto gateway details),
 --   mt5_deals (deals read from the MT5 Web API), mt5_positions (open positions snapshot), mt5_unlinked (MT5 logins not linked to a client),
---   mt5_state (sync status), mt5_ops (ledger of every MT5 action: request, answer, deal ticket, staff user),
+--   mt5_state (sync status), mt5_ops (log of every MT5 call: command, parameters without secrets, retcode, staff user; no money moves in MT5 from our system),
 --   partners (IBs), ib_plans (commission plans), commissions (commission ledger), ib_clicks (referral link clicks, hashed IP)
 -- The same views are created on Postgres (Neon) when DATABASE_URL is set: json_extract is translated to jsonb (lib/pg.js).
 --
@@ -193,14 +193,14 @@ SELECT id, json_extract(data,'$.ticket') AS ticket, json_extract(data,'$.login')
   json_extract(data,'$.position_id') AS position_id, json_extract(data,'$.comment') AS comment, json_extract(data,'$.synced_at') AS synced_at
 FROM mt5_deals;
 
--- MT5 actions after approval: one row per attempt (balance operations, account creation, leverage changes)
+-- MT5 call log. Our system never moves money in MT5: rows are account actions (create_account, leverage), the calls a person
+-- started (kind calls: every call with its parameters, no secrets) and the sync's reads summed per hour (kind sync_reads).
 DROP VIEW IF EXISTS v_mt5_ops;
 CREATE VIEW v_mt5_ops AS
-SELECT o.id, json_extract(o.data,'$.kind') AS kind, json_extract(o.data,'$.leg') AS leg, json_extract(o.data,'$.status') AS status,
-  json_extract(o.data,'$.payment_id') AS payment_id, json_extract(o.data,'$.bonus_id') AS bonus_id, json_extract(o.data,'$.account_id') AS account_id,
-  json_extract(o.data,'$.login') AS login, json_extract(o.data,'$.amount') AS amount, json_extract(o.data,'$.comment') AS comment,
-  json_extract(o.data,'$.attempt') AS attempt, json_extract(o.data,'$.retcode') AS retcode, json_extract(o.data,'$.ticket') AS deal_ticket,
-  json_extract(o.data,'$.found_existing') AS found_existing, json_extract(o.data,'$.error') AS error,
+SELECT o.id, json_extract(o.data,'$.kind') AS kind, json_extract(o.data,'$.command') AS command, json_extract(o.data,'$.status') AS status,
+  json_extract(o.data,'$.account_id') AS account_id, json_extract(o.data,'$.login') AS login, json_extract(o.data,'$.op_id') AS op_id,
+  json_extract(o.data,'$.attempt') AS attempt, json_extract(o.data,'$.retcode') AS retcode, json_extract(o.data,'$.error') AS error,
+  json_extract(o.data,'$.calls_total') AS calls_total,
   json_extract(o.data,'$.by') AS staff_id, json_extract(u.data,'$.name') AS staff_name, json_extract(o.data,'$.created_at') AS created_at, json_extract(o.data,'$.finished_at') AS finished_at
 FROM mt5_ops o LEFT JOIN users u ON u.id = json_extract(o.data,'$.by');
 

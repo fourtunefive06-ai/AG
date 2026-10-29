@@ -1,5 +1,6 @@
 // Integration test for the IB programme against the mock MT5 Web API: a deal synced from MT5 → commission line →
-// month approval → payout to the IB's MT5 account (two approvals above the limit) → MT5 deal ticket recorded.
+// month approval → payout request (two approvals above the limit) → operations credits it in MT5 Manager → matched → confirmed
+// with the MT5 deal ticket. Our system never moves money in MT5.
 //   node tools/ib-test.mjs
 import { createRequire } from "node:module";
 import assert from "node:assert";
@@ -26,7 +27,7 @@ try {
   const OPS = crm.saveUser(ADMIN, { name: "Fatima", username: "fatima", role: "operations", password: "Strong-pass-456", must_change_password: false });
   const OPS2 = crm.saveUser(ADMIN, { name: "Ali", username: "ali", role: "operations", password: "Strong-pass-457", must_change_password: false });
   const PT = crm.saveUser(ADMIN, { name: "Lina", username: "lina", role: "partnerships", password: "Strong-pass-789", must_change_password: false });
-  crm.saveSettings(ADMIN, { mt5: { writes_enabled: true }, portal: { second_approval_over: 50, account_types: crm.getSettings().portal.account_types.map(t => t.id === "ecn" ? Object.assign({}, t, { mt5_group: G }) : t) } });
+  crm.saveSettings(ADMIN, { mt5: { account_creation_enabled: true }, portal: { second_approval_over: 50, account_types: crm.getSettings().portal.account_types.map(t => t.id === "ecn" ? Object.assign({}, t, { mt5_group: G }) : t) } });
   const PNG = "data:image/png;base64,iVBORw0KGgo=";
   let n = 0;
   const client = async (first, ib) => {
@@ -60,18 +61,26 @@ try {
   // the month ends; the partnerships manager approves
   const period = lines[0].period; T += 35 * 864e5;
   const ap = crm.ibApprovePeriod(PT, pt0.id, period); ok(ap.approved === 2 && ap.amount === 70, "month approved");
-  // payout to the IB's own MT5 account: two approvals over the limit, then credited in MT5 with comment IB <ref>
+  // payout to the IB's own MT5 account: two approvals over the limit; operations credits it by hand in MT5 Manager with IB <ref>
   const p = crm.portalIbPayout(ib.C, { method: "mt5", account_id: ib.acc.id }); ok(p.amount === 70 && p.type === "ib_payout", "payout requested");
-  assert.throws(() => crm.mt5PaymentAction(OPS, p.id, "credit", {}), /Approve the payout first/); passed++;
+  assert.throws(() => crm.decidePayment(OPS, p.id, "complete", { no_match_reason: "x", reference: "x" }), /two approvals|Approve/); passed++;
   crm.decidePayment(OPS, p.id, "approve"); ok(store.get("payments", p.id).status === "first_approved", "over the limit: first approval");
   crm.decidePayment(OPS2, p.id, "approve"); ok(store.get("payments", p.id).status === "approved", "second approval by another person");
-  const before = mock.state.accounts.get(ib.acc.login).Balance;
-  const res = await execute(ctx, crm.mt5PaymentAction(OPS, p.id, "credit", { amount: 9999 }).op);
-  const pay = store.get("payments", p.id), deal = mock.state.deals.find(d => d.Comment === "IB " + pay.reference);
-  ok(res.ok && pay.status === "completed" && deal && deal.Profit === 70 && mock.state.accounts.get(ib.acc.login).Balance === before + 70, "credited $70 in MT5 (the payout amount, not the typed one)");
-  ok(pay.ext_reference === "MT5 deal #" + deal.Deal && pay.mt5.ib_payout.ticket === String(deal.Deal), "deal ticket recorded on the payout");
+  const open = () => crm.listPayments(OPS, { status: "open" }).find(z => z.id === p.id);
+  ok(open().mt5_match.legs[0].state === "missing" && open().mt5_match.legs[0].comment === "IB " + p.reference, "approved: waiting for the credit in MT5 Manager, comment shown");
+  ok(!mock.state.calls.some(c => /trade|order|balance/.test(c.path)), "our system sent no money command to MT5");
+  // operations credits $70 in MT5 Manager (simulated in the mock); the next sync reads the balance deal
+  const t = Math.floor(T / 1000);
+  await set({ deals: [{ Deal: 7801, Login: Number(ib.acc.login), Time: t, TimeMsc: t * 1000, Action: 2, Entry: 0, Profit: 70, Comment: "IB " + p.reference }] });
+  await runSync(ctx);
+  ok(store.get("payments", p.id).status === "approved" && store.all("commissions").filter(l => l.payout_id === p.id).every(l => l.status === "approved"), "seen in MT5, but nothing is applied on its own");
+  const m = open().mt5_match; ok(m.ok && m.tickets[0] === "7801", "matched: Seen in MT5 · deal #7801");
+  crm.decidePayment(OPS, p.id, "complete", { mt5_ticket: m.tickets[0], amount: 9999 });
+  const pay = store.get("payments", p.id);
+  ok(pay.status === "completed" && pay.amount === 70, "confirmed for the payout amount (not a typed one)");
+  ok(pay.ext_reference === "MT5 deal #7801" && pay.mt5.tickets[0] === "7801" && pay.mt5.by === OPS.id, "deal ticket recorded on the payout, with who confirmed it");
   ok(store.all("commissions").filter(l => l.payout_id === p.id).every(l => l.status === "paid"), "commission lines paid");
-  ok(store.all("mt5_ops").find(o => o.payment_id === p.id).approved_by.length === 3, "ledger keeps both approvers and who credited");
   ok(crm.getPartner(PT, pt0.id).audit.some(a => a.action === "payout_paid"), "payout in the partner's audit trail");
-  console.log(`✔ IB chain: ${passed} checks passed (MT5 deal → commission → month approval → payout credited in MT5 with the deal ticket)`);
+  ok(crm.mt5Reconcile(OPS, { from: new Date(T - 864e5).toISOString().slice(0, 10), to: new Date(T + 864e5).toISOString().slice(0, 10) }).rows.find(r => r.login === ib.acc.login).matched === 1, "reconciliation matches the IB payout");
+  console.log(`✔ IB chain: ${passed} checks passed (MT5 deal → commission → month approval → payout request → credited by hand in MT5 Manager → matched → confirmed with the deal ticket)`);
 } finally { mt5.reset(); await mock.close(); }

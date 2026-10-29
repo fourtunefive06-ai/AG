@@ -33,11 +33,30 @@ try {
   // range lock: refused before anything is sent, logged and alerted
   const callsBefore = mock.state.calls.length;
   await assert.rejects(mt5.getUser(1234567), e => e.range === true); passed++;
-  await assert.rejects(mt5.balance({ login: 9000001, amount: 5, comment: "x", approval: { payment_id: "P1", by: "U1" } }), e => e.range === true); passed++;
+  await assert.rejects(mt5.updateUser(9000001, { leverage: 100 }), e => e.range === true); passed++;
   ok(mock.state.calls.length === callsBefore, "nothing sent to MT5 for an out-of-range login");
   ok(alerts.length === 2 && /outside the Absel Global range/.test(alerts[0]), "range lock alerted");
-  // balance needs an approval
-  await assert.rejects(mt5.balance({ login: 7000001, amount: 5, comment: "x" }), /approved payment/); passed++;
+  // no money movement: there is no balance, credit or trade function, and anything that would change money is refused before a request
+  ok(!Object.keys(mt5).some(k => /balance|credit|bonus|deposit|withdraw|trade|order/i.test(k)), "lib/mt5.js has no balance, credit or trade function");
+  ok(![...mt5.ALLOWED].some(c => /^(trade|order)\//.test(c) || /balance|credit|position\/(update|delete|close)/.test(c)), "the allow-list has only reads, user/add and user/update");
+  ok(!/\/api\/(trade|order)|position\/(update|delete)/.test(require("fs").readFileSync(new URL("../lib/mt5.js", import.meta.url), "utf8")), "no balance or trade endpoint anywhere in lib/mt5.js");
+  // the allow-list itself: trade/balance (and every other money or trade command) is refused before any request
+  const nRaw = mock.state.calls.length, aRaw = alerts.length;
+  for (const p of ["/api/trade/balance?login=7000001&type=2&balance=100", "/api/trade/balance?login=7000001&type=3&balance=100", "/api/order/add", "/api/position/delete", "/api/deal/update"]) { assert.throws(() => mt5.checkCommand(p), e => e.refused === true); passed++; }
+  ok(mock.state.calls.length === nRaw && alerts.length === aRaw + 5, "trade/balance, credit, order, position and deal changes are impossible: refused and alerted, nothing sent");
+  for (const p of ["/api/user/add", "/api/user/get?login=1", "/api/group/get?group=x", "/api/user/logins?group=x", "/api/user/get_batch?login=1"]) mt5.checkCommand(p, p === "/api/user/add" ? { Group: "x" } : undefined);
+  passed++;
+  const sent0 = mock.state.calls.length, alerts0 = alerts.length;
+  for (const f of [{ balance: 100 }, { credit: 50 }, { group: "real\\other" }, { leverage: 100, balance: 5 }]) { await assert.rejects(mt5.updateUser(7000001, f), e => e.refused === true && /refused/.test(e.message)); passed++; }
+  ok(mock.state.calls.length === sent0 && !mock.state.calls.some(c => /trade|order/.test(c.path)), "refused before any network request (balance, credit or group through updateUser)");
+  ok(alerts.length === alerts0 + 4, "each refusal is alerted");
+  // the call log: command, parameters without secrets, retcode
+  const logged = []; mt5.setLog(c => logged.push(c)); mt5.reset();
+  await mt5.ping(); await assert.rejects(mt5.updateUser(7000001, { credit: 1 }), e => e.refused); passed++;
+  ok(logged.some(c => c.command === "auth/start" && c.retcode) && logged.some(c => c.command === "auth/answer") && logged.some(c => c.command === "test/access" && /^0/.test(c.retcode)), "every call logged with its command and retcode");
+  ok(logged.some(c => c.refused && c.command === "user/update"), "a refused call is logged too");
+  ok(!JSON.stringify(logged).includes(mock.cfg.password) && logged.find(c => c.command === "auth/answer").params.srv_rand_answer === "***", "no secrets in the call log");
+  mt5.setLog(null);
   ok(mt5.toLots({ Volume: 10000 }) === 1 && mt5.toLots({ VolumeExt: 50000000, Volume: 5000 }) === 0.5 && mt5.toLots({ Volume: 100 }) === 0.01, "volume to lots");
 
   /* ---------- CRM with a client and an account ---------- */
@@ -70,11 +89,14 @@ try {
   // a deposit our system completed, with its reference (matches deal 1001)
   const dp = crm.portalDeposit(C, { account_id: req.id, method: "bank", amount: 1000 });
   store.get("payments", dp.id).reference = "D-REC001";
-  crm.decidePayment(OPS, dp.id, "complete", { reference: "BANK-1" });
 
   /* ---------- first sync ---------- */
   const r1 = await runSync({ mt5, crm, store });
   ok(r1.groups.length === 3 && r1.groups.every(g => !g.error), "all three groups read");
+  // operations credited it in MT5 Manager with "DEP D-REC001": seen in MT5, confirmed by a person
+  ok(store.get("payments", dp.id).status === "pending", "a matched deal is never applied on its own");
+  crm.decidePayment(OPS, dp.id, "complete", { mt5_ticket: "1001", reference: "BANK-1" });
+  ok(store.get("payments", dp.id).status === "completed" && store.get("payments", dp.id).ext_reference === "MT5 deal #1001 · BANK-1", "confirmed with the MT5 deal");
   const acc = store.get("accounts", req.id);
   ok(acc.balance === 1500 && acc.equity === 1520 && acc.margin_free === 1420 && acc.group === G_ECN && acc.mt5_seen_at, "balance, equity, margin and group updated");
   ok(r1.deals.new === 5 && store.size("mt5_deals") === 5, "deals stored");
@@ -118,8 +140,20 @@ try {
   mock.close && await fetch(mock.url + "/_drop", { method: "POST" });
   const st = crm.mt5Status(OPS);
   ok(st.mode === "api" && st.sync.last_ok_at && st.unlinked === 1, "status for the settings card");
+  ok(st.account_creation_enabled === false && !("writes_enabled" in (crm.getSettings().mt5 || {})), "MT5 account creation off by default; no money switch exists");
 
-  console.log(`✔ MT5 Web API: ${passed} checks passed (auth, re-auth, wrong password, range lock, sync, no duplicates, balances, positions, unlinked, link, reconciliation)`);
+  /* ---------- mt5_ops call log ---------- */
+  const calls = []; mt5.setLog(c => calls.push(c));
+  await runSync({ mt5, crm, store }); mt5.setLog(null);
+  ok(calls.length > 3 && calls.every(c => c.command && (c.retcode || c.error)), "a sync's calls are reported");
+  crm.mt5LogCalls(calls, null); crm.mt5LogCalls(calls, null);
+  const hourly = store.all("mt5_ops").filter(o => o.kind === "sync_reads");
+  ok(hourly.length === 1 && hourly[0].calls_total === calls.length * 2 && hourly[0].counts["deal/get_batch"].n >= 2 && hourly[0].by === "system", "the timer's reads are summed per hour");
+  crm.mt5LogCalls(calls.slice(0, 2), OPS);
+  const mine = store.all("mt5_ops").find(o => o.kind === "calls" && o.by === OPS.id);
+  ok(mine && mine.calls.length === 2 && mine.calls[0].command && mine.calls[0].at, "a sync started by staff is logged call by call with the staff user");
+
+  console.log(`✔ MT5 Web API: ${passed} checks passed (auth, re-auth, wrong password, range lock, allow-list: no money commands, call log, sync, no duplicates, balances, positions, unlinked, link, reconciliation)`);
 } finally {
   mt5.reset(); await mock.close();
 }

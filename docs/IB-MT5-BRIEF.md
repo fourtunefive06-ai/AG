@@ -12,7 +12,7 @@ Paste one of these prompts into Claude Code in VS Code, from the project root:
 > Read `docs/IB-MT5-BRIEF.md` fully, then implement **Phase A (MT5 Web API connector and read-only sync)** only. Follow section 2 (codebase conventions) and section 3 (non-negotiables) exactly. Build the mock MT5 server first and test against it. Run `node tools/simulate.js` and the new tests before you finish. Show me the list of changed files and anything you had to assume.
 
 **Phase B**
-> Read `docs/IB-MT5-BRIEF.md`. Phase A is done. Implement **Phase B (MT5 actions after back-office approval)** only. Same rules and tests.
+> Read `docs/IB-MT5-BRIEF.md`. Phase A is done. Implement **Phase B (MT5 account creation, and matching manual MT5 money operations)** only. Remember non-negotiable 1: no money movement in MT5 from our system. Same rules and tests.
 
 **Phase C**
 > Read `docs/IB-MT5-BRIEF.md`. Phases A and B are done. Implement **Phase C (IB / partner system)**. It's large, so work in the sub-steps C1–C7 and run the tests after each one.
@@ -37,10 +37,16 @@ If something in this brief conflicts with the code, the code's existing behaviou
   - a reserved **login series** (the account number range for Absel Global)
   - a first test account
 - **Business rules decided by the owner:**
-  - **Every money movement in MT5 needs back-office approval, even $1.** The system never credits or debits on its own. A person approves, then the system carries out the MT5 balance operation and records the MT5 deal ticket.
-  - Withdrawals keep the existing approval rule: two approvals above `second_approval_over`.
+  - **No money moves in MT5 from our system: not now and not for at least the next 3 months.** Our system never calls any MT5 balance, credit, bonus-credit, deposit, withdrawal, order or trade endpoint, automatically or after approval. Absel Markets' operations team does every credit and debit in MT5 Manager themselves.
+  - **What our system does with MT5:**
+    - **reads** accounts, balance, equity, margin, deals and positions
+    - **creates** trading accounts and edits non-money account details (name, email, leverage within the allowed list)
+
+    That's all.
+  - Deposits, withdrawals, transfers, bonus credits and IB payouts keep today's flow: the client requests, operations approves in our back office (every amount, even $1; two approvals for large withdrawals), operations does the money operation in MT5 Manager, then confirms in our back office. The difference is that our sync now **finds the matching MT5 balance deal** and offers it for one-click confirmation, and flags mismatches.
+  - Automated credit and debit may come later as a separate, explicitly enabled feature with its own brief. Don't build it, stub it or leave unused code for it now.
   - Opening an account is not a money movement. It can run with one operations click, or automatically for demo accounts.
-  - IB commissions come from **real MT5 deals** synced through the API. No CSV is needed.
+  - IB commissions are calculated from **real MT5 deals** synced through the API. No CSV is needed.
   - IB setup:
     - per-lot commission plus optional CPA per qualified FTD
     - two levels (IB and sub-IB, the master earning an override)
@@ -48,7 +54,7 @@ If something in this brief conflicts with the code, the code's existing behaviou
     - the IB uses the same client-area login and gets a **Partner** section
     - IB clients still get a sales agent, but are flagged and kept out of agent FTD targets
     - the IB sees clients masked
-    - payouts monthly, $50 minimum, paid to the IB's MT5 account, bank or USDT, with approval
+    - payouts monthly, $50 minimum, with approval; operations pays them by hand (credit in MT5 Manager, bank or USDT)
 
 ---
 
@@ -91,18 +97,23 @@ If something in this brief conflicts with the code, the code's existing behaviou
   - only in `.env`; document every new variable in `.env.example`
   - never log passwords or tokens
   - never commit `.env`
-- **Wording:** plain English in the UI ("Credit in MT5", not "Execute balance op").
+- **Wording:** plain English in the UI ("Seen in MT5", "Confirm deposit", not "Balance deal matched").
 - **Docs:** add a README section per feature.
 
 ---
 
 ## 3. Non-negotiables
 
-1. **Approval before money.** No code path may call an MT5 balance operation without an approved payment record and the id of the approving staff user. Withdrawals keep the two-person rule above the limit.
+1. **No money movement through MT5 from our system.** `lib/mt5.js` keeps an **allow-list of MT5 commands** and refuses anything else with an error, before any network call:
+   - `auth/start`, `auth/answer`, `test/access`
+   - `user/get`, `user/add`, `user/update`, `user/account/get`, `user/logins`
+   - `deal/get_batch`, `position/get_batch`, `group/get`
+
+   `user/update` may only send name, email, phone, country, comment and leverage, and leverage must be in the type's allowed list. Anything that changes balance, credit, positions or orders is refused (`trade/balance`, any `trade/*`, `order/*`, `position` modify or close, and credit or bonus operations). A test must prove that a balance call is impossible.
 2. **Login range lock.** Every MT5 call that touches an account must check that the login is inside `MT5_LOGIN_FROM`–`MT5_LOGIN_TO`. Refuse, log and alert otherwise. Group names come only from our settings; never take them from user input.
-3. **Exactly once.** Every balance operation carries our payment reference in its MT5 comment. Before any retry, look in MT5 deals for that comment on that login. If it's there, record it and don't send it again. Store each attempt in an `mt5_ops` ledger: request, response, retcode, deal ticket, staff user, time.
+3. **Matching, not moving.** Operations does money in MT5 Manager with our payment reference in the comment (`DEP {ref}`, `WD {ref}`, `TRF-OUT/TRF-IN {ref}`, `BONUS {id}`, `IB {ref}`). Our sync reads those balance deals and matches them to our records. A match is shown for one-click confirmation by a person and is never applied automatically. Every MT5 call our system makes (reads and account creation) is stored in an `mt5_ops` log: command, parameters without secrets, retcode, staff user and time.
 4. **Manual fallback.** Everything still works with `MT5_MODE=manual`, today's behaviour. If MT5 can't be reached in API mode, the action fails with a visible error and operations can retry or record it manually. Nothing is lost silently.
-5. **Read before write.** Phase A is read-only. Nothing writes to MT5 until Phase B, and Phase B ships with a settings switch, `mt5.writes_enabled`, that is off by default.
+5. **Read before write.** Phase A is read-only. Account creation arrives in Phase B behind a settings switch, `mt5.account_creation_enabled`, that is off by default.
 6. **Privacy.** The Partner section never shows a client's email, phone, full name, documents or address.
 7. **Audit.** Every MT5 action, IB approval, plan change, client reassignment, commission adjustment and payout is logged with who, when, before and after.
 
@@ -148,8 +159,8 @@ MT5_AGENT=AbselGlobal
 - `getGroup(name)` (`/api/group/get`)
 - For Phase B, written now but not called yet:
   - `createUser({ group, name, leverage, email, country, passMain, passInvestor, login? })` (`/api/user/add`)
-  - `updateUser(login, fields)`
-  - `balance({ login, amount, comment })` (`/api/trade/balance`, `type=2` balance; negative amount for withdrawals; `check_margin=1`)
+  - `updateUser(login, fields)`: only the non-money fields allowed in section 3.1
+- **There is no balance, credit or trade function.** Don't write one.
 - Every function checks the login range lock (section 3.2) before calling MT5.
 
 **Volume units:** MT5 deal volume is an integer in 1/10000 lot (`VolumeExt` has more precision). Convert to lots in one helper, `toLots(deal)`. Confirm against the docs and a real deal from the test account.
@@ -174,7 +185,7 @@ MT5_AGENT=AbselGlobal
 - In Client area settings, add per account type:
   - `mt5_group` (e.g. `real\absel-global\ecn`)
   - `mt5_demo_group`
-- Add a global `mt5.writes_enabled` switch (default false), shown only in API mode.
+- Add a global `mt5.account_creation_enabled` switch (default false), shown only in API mode.
 - Add an MT5 status card on the settings page: mode, server, connected or not, last sync, login range, groups found. Same style as the B2BINPAY and Cyrafa cards.
 
 ### A4. Read-only sync (server timer, every `MT5_SYNC_SECONDS`)
@@ -187,7 +198,7 @@ MT5_AGENT=AbselGlobal
 - **Positions:** a snapshot of open positions per account, for lifecycle "active trader" and margin display.
 - **Trading activity:** existing logic (`markTradingStarted`, `recordTrading`, `lots_total`, `last_trade_at`, the dormant segment) must now be fed from deals. Use the existing functions; don't duplicate them.
 - **Reconciliation report** (back office → Trading → MT5 reconciliation, operations and admin): for the period, our completed deposits and withdrawals per login against MT5 balance deals per login, highlighting differences.
-  - Balance deals with our reference in the comment match automatically.
+  - Balance deals with our reference in the comment are matched for display. Confirming still needs a person (Phase B).
   - Others are shown as "made outside the system".
 
 ### A5. Tests
@@ -201,52 +212,50 @@ MT5_AGENT=AbselGlobal
 
 ---
 
-## 5. Phase B: MT5 actions after back-office approval
+## 5. Phase B: account creation, and matching manual MT5 money operations
 
-All of this runs only when `MT5_MODE=api` **and** `mt5.writes_enabled` is on. Otherwise the existing manual buttons stay.
+Account creation runs only when `MT5_MODE=api` **and** `mt5.account_creation_enabled` is on. Matching needs only `MT5_MODE=api`. With manual mode everything works exactly as today.
 
-### B1. Account opening
+### B1. Account opening (the only MT5 write)
 - **Live account** request (`portalRequestAccount`): the operations button becomes **"Approve and create in MT5"**.
   - Create the user in the type's `mt5_group` with the requested leverage, name, email and country, and generate a strong main and investor password.
   - Record the login, server and group through the same code path as `openAccount`. The main password uses the existing one-time reveal: `pw_once` is shown once in the client area, then erased. Never store or log the investor password.
-  - The client sees the account at once and receives the existing account-opened email.
-- **Demo accounts** are created automatically on request, since no money is involved.
+  - The new account has a **zero balance**. Our system never funds it.
+- **Demo accounts** are created automatically on request. Their starting virtual balance comes from the MT5 demo group's own setting at Absel Markets; our system doesn't deposit into demo accounts either.
 - **Failure:** the request stays in "requested" with the MT5 error shown. Operations can retry or use the manual "Record account" form.
-- Check leverage changes against the type's allowed list. Changing leverage on an existing account is an operations action with an audit entry.
+- Leverage changes go through `updateUser` and must be in the type's allowed list. It's an operations action with an audit entry.
 
-### B2. Deposits
-- **Flow:** client deposit → money confirmed (gateway `paid`, or operations has checked the bank or e-wallet receipt) → operations clicks **"Approve and credit in MT5"** → `balance(+amount, comment "DEP {reference}")` → record the deal ticket → status `completed`.
-- The existing first-deposit and FTD logic, emails, notifications and payment reports must work unchanged.
-- Show "Credited in MT5 · deal #123456 · by Fatima" on the payment.
-- **On timeout or unknown result:** mark the payment `mt5_unknown` and don't retry blindly. Run the exactly-once check from section 3.3 on the next sync. Operations can click "Check MT5 again".
+### B2. Deposits (manual credit in MT5, matched by our system)
+- **Flow, the same as today plus matching:** client deposit → money confirmed (gateway `paid`, or receipt checked) → operations approves → operations credits in **MT5 Manager** with comment `DEP {reference}` → our sync finds that balance deal → the payment shows **"Seen in MT5 · deal #123456 · $500 · 14:02"** with a **"Confirm deposit"** button.
+  - Confirming sets the existing `completed` status, with the deal ticket as the reference and the staff user. All existing first-deposit and FTD logic, emails and reports run unchanged.
+- **Warnings** on the payment and in the operations desk:
+  - amount in MT5 differs from the request
+  - the deal is on a different login
+  - no MT5 deal found after X hours (setting, default 2)
+  - an MT5 balance deal with a `DEP` reference we don't know
+- Operations can still confirm without a match, with a reason, e.g. "MT5 comment missing". It's logged.
 
 ### B3. Withdrawals
 - Same approvals as today (one approval, or two above the limit).
-- On final approval, the system:
-  1. reads the live free margin (refuse with a clear message if it's not enough)
-  2. runs `balance(-amount, comment "WD {reference}")`
-  3. marks the withdrawal **"Debited in MT5, pay the client"**
-- Operations then pays by bank or USDT outside and clicks **"Mark paid"** with the payout reference, which sets status `completed` and sends the existing email.
-- If the client cancels before final approval, nothing happens in MT5.
+- After approval, operations debits in MT5 Manager with `WD {reference}` and pays the client by bank or USDT. The sync shows **"Debit seen in MT5 · deal #…"**. Operations clicks **"Mark paid"** with the payout reference; the existing completion and email follow.
+- The approval screen shows the **live free margin** from the sync, so operations can see whether the client can afford it before debiting in MT5. It's informational only.
 
 ### B4. Internal transfers
-- One approval → debit the source with `TRF-OUT {reference}` → credit the target with `TRF-IN {reference}`.
-- If the credit fails after the debit succeeded, raise a red alert to operations with a one-click retry of the credit. Never reverse automatically.
+- One approval. Operations moves the money in MT5 Manager (`TRF-OUT {ref}` on the source, `TRF-IN {ref}` on the target).
+- The sync matches both deals. Warn if only one side is seen after X hours.
 
-### B5. Company-funded $100 bonus accounts
-The existing bonus flow gets an "Approve and credit in MT5" action with comment `BONUS {id}`. Its withdrawal rules stay as they are.
+### B5. Company-funded $100 bonus accounts and MT5 credit
+- Done in MT5 Manager by Absel Markets with comment `BONUS {id}`. Our bonus flow shows the matched deal and asks for a one-click confirm.
+- Our system never touches the MT5 **credit** field. It only reads and displays it if the account data includes it.
 
 ### B6. Tests
 - Simulate and integration tests against the mock. They must cover:
-  - no balance call without approval
-  - two approvals above the limit
+  - **any attempt to call a non-allowed command (e.g. `trade/balance`) throws before a network request**, including through `updateUser` with a balance field
   - out-of-range login refused
-  - the retry after timeout finds the existing deal and doesn't double-credit
-  - insufficient margin blocks a withdrawal
-  - a transfer whose credit fails raises the alert
-  - `writes_enabled=false` keeps the manual flow
-
----
+  - account creation off by default; on, it creates in the right group with zero balance
+  - matching: exact match, amount mismatch, wrong login, missing after X hours, unknown reference, two deals with the same reference (flag, don't pick one)
+  - confirming without a match requires a reason
+  - manual mode unchanged
 
 ## 6. Phase C: IB / partner system
 
@@ -348,7 +357,7 @@ The existing bonus flow gets an "Approve and credit in MT5" action with comment 
 
 ### C6. Payouts
 - A payout request creates a `payments` record of **type `ib_payout`**, so it appears in Deposits & withdrawals with the same approval rules, including two approvals over the limit.
-  - **To MT5:** after approval, `balance(+amount, comment "IB {reference}")`, using the Phase B machinery.
+  - **To MT5:** after approval, operations credits the IB's own MT5 account in MT5 Manager with comment `IB {reference}`. Our sync matches the deal and operations confirms, the same as B2.
   - **To bank or USDT:** after approval, operations pays and clicks "Mark paid".
 - When paid, the included commission lines get `payout_id` and status `paid`. If a payout is rejected, its lines go back to `approved`.
 - No payout may include `pending` or `held` lines.
@@ -393,7 +402,7 @@ The existing bonus flow gets an "Approve and credit in MT5" action with comment 
   - no duplicate lines on re-sync
   - month close and payout flows, including a rejected payout restoring lines
   - Partner views expose no email or phone (check the RPC output)
-- **Integration test** against the mock MT5: the full chain of a sync'd deal → commission → approve → payout to MT5 with the deal ticket recorded.
+- **Integration test** against the mock MT5: the full chain of a synced deal → commission → approve → payout request → manual MT5 credit (simulated in the mock) → matched → confirmed, with the deal ticket recorded.
 
 ---
 
@@ -411,7 +420,7 @@ Add `v_partners`, `v_commissions`, `v_mt5_deals` and `v_mt5_ops`, in the same st
 ## 9. Still to confirm with Absel Markets (don't hard-code; keep as settings)
 - MT5 group names per account type and for demo; allowed leverage per group
 - Web API port, and the server build version for `auth/start`
-- That the manager has rights for create/edit users, balance operations and reading deals/positions, limited to Absel Global's groups
+- That the manager has rights only to create and edit users and to read accounts, deals and positions, limited to Absel Global's groups. **Ask them not to grant balance or credit rights to the Web API manager**, so the rule is enforced on the MT5 side as well.
 - Our server IP whitelisted
-- Comment format they want on balance operations
+- The comment format their operations team will use for manual balance operations (we suggest `DEP/WD/TRF-OUT/TRF-IN/BONUS/IB {reference}`), so our matching works
 - Whether commission can also be paid with MT5's own "agent" mechanism later (not used now)

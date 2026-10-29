@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /* Mock MT5 Web API for development and tests (plain HTTP, in memory).
    - the manager sign-in handshake (auth/start + auth/answer) with a fixed password; the session belongs to the TCP connection
-   - users, accounts, deals and positions; new logins come from the login range; balance operations create balance deals
-   - refuses: wrong password, calls without a session, logins outside the range, withdrawals above the free margin
-   - POST /_set (JSON) changes the state for tests: { users, accounts, deals, positions, fail: { path, mode: "timeout"|"error"|"drop", times }, reset }
+   - users, accounts, deals and positions; new logins come from the login range (new accounts start at zero)
+   - refuses: wrong password, calls without a session, logins outside the range; it has no balance or trade endpoint
+   - POST /_set (JSON) changes the state for tests: { users, accounts, deals, positions, manager: [{ login, amount, comment }],
+     fail: { path, mode: "timeout"|"error"|"drop", times }, reset }. "manager" is operations crediting or debiting in MT5 Manager
+     (outside our system): the balance changes and a balance deal with that comment appears.
      GET /_state returns it; POST /_drop closes every connection (the client must sign in again)
    Run alone:  node tools/mt5-mock.js [--port 8444] [--seed]   → prints the .env lines to use it */
 "use strict";
@@ -70,16 +72,14 @@ function startMock(o = {}) {
       if (body.Group && !cfg.groups.includes(body.Group)) return err("3 Invalid parameters (unknown group)");
       putUser(body); return { body: ok(userOf(body.Login)) };
     }
-    if (path === "/api/trade/balance") {
-      const login = qs.get("login"), amt = Number(qs.get("balance"));
-      if (!inRange(login)) return err("8 Access denied (login outside the manager's range)"); if (!userOf(login)) return err("13 Not found");
-      if (qs.get("type") !== "2" || !amt) return err("3 Invalid parameters");
-      const a = accOf(login); if (amt < 0 && qs.get("check_margin") === "1" && -amt > (a.MarginFree ?? a.Balance)) return err("10019 Not enough money");
-      a.Balance = Math.round((a.Balance + amt) * 100) / 100; a.Equity = Math.round((a.Equity + amt) * 100) / 100; a.MarginFree = Math.round((a.Equity - a.Margin) * 100) / 100; S.accounts.set(String(login), a);
-      const now = Date.now(), d = { Deal: S.nextDeal++, Login: Number(login), Time: Math.floor(now / 1000), TimeMsc: now, Action: 2, Entry: 0, Symbol: "", Volume: 0, VolumeExt: 0, Price: 0, Profit: amt, Commission: 0, Storage: 0, PositionID: 0, Comment: String(qs.get("comment") || "").slice(0, 31) };
-      S.deals.push(d); return { body: ok({ ticket: String(d.Deal) }) };
-    }
     return err("4 Not found", 404);
+  }
+  // Operations in MT5 Manager (not through the Web API): a balance operation with a comment
+  function managerBalance({ login, amount, comment }) {
+    const amt = Math.round(Number(amount) * 100) / 100, a = accOf(login);
+    a.Balance = Math.round((a.Balance + amt) * 100) / 100; a.Equity = Math.round((a.Equity + amt) * 100) / 100; a.MarginFree = Math.round((a.Equity - a.Margin) * 100) / 100; S.accounts.set(String(login), a);
+    const now = Date.now(), d = { Deal: S.nextDeal++, Login: Number(login), Time: Math.floor(now / 1000), TimeMsc: now, Action: 2, Entry: 0, Symbol: "", Volume: 0, VolumeExt: 0, Price: 0, Profit: amt, Commission: 0, Storage: 0, PositionID: 0, Comment: String(comment || "").slice(0, 31) };
+    S.deals.push(d); return d;
   }
 
   const sockets = new Set();
@@ -100,7 +100,8 @@ function startMock(o = {}) {
         if (b.remove_deals) S.deals = S.deals.filter(d => !b.remove_deals.includes(d.Deal));
         if (b.positions) S.positions = b.positions;
         if (b.fail !== undefined) S.fail = b.fail;
-        return reply(200, { ok: true });
+        const made = (b.manager || []).map(managerBalance);
+        return reply(200, { ok: true, deals: made.map(d => String(d.Deal)) });
       }
       const sess = req.socket.__mt5 || (req.socket.__mt5 = {});
       S.calls.push({ path: url.pathname, query: Object.fromEntries([...url.searchParams].filter(([k]) => !/pass|rand/.test(k))), at: Date.now() });
