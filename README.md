@@ -296,6 +296,8 @@ The CRM has **two workspaces**, so each team sees only the tools it uses.
 
 **Settings.** Client area settings → Email branding: custom logo URL (a hosted PNG or JPG, never SVG; leave it empty and the header uses `public/assets/email-logo-white.png` on a dark colour or `email-logo-dark.png` on a light one), header and button colours, help line, legal line, risk warning, address, website, social links, and *Send test email to me*. The footer comes from here, so don't type the legal line, risk warning or unsubscribe link into a template.
 
+**Website settings.** Settings → Website settings manages the homepage: the WhatsApp number, support email, phone, office address and links, the popup and live price switches, and the page's text, FAQ and market tabs. The homepage reads saved values from `/site-config.js` on every load, so a save shows on abselglobal.com straight away. Emails, WhatsApp messages and the client area use the same WhatsApp number, support email and links. [public/site-fields.js](public/site-fields.js) lists every field; to add one, add it there. Only text that differs from `public/index.html` is stored, and an empty field goes back to the page's own text. If the settings can't load, the page keeps its own text. The restricted countries list is enforced in `server.js` and isn't editable here. Test with `node tools/site-settings-test.mjs`.
+
 **Categories.** Each template is one of:
 - *Transactional* (account, payment, KYC, security): no unsubscribe link; sent even to marketing opt-outs. Email still goes to Do-not-contact leads; WhatsApp never does.
 - *Marketing* (newsletter, re-engagement, offers): has an unsubscribe link; respects opt-outs and Do not contact.

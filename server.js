@@ -758,6 +758,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/webhooks/payments/b2binpay" && m === "POST") return await b2bCallback(req, res);
     if (p === "/webhooks/payments/cyrafa" && m === "POST") return await cyrafaWebhook(req, res);
     if (p === "/unsubscribe" && (m === "GET" || m === "POST")) return await unsubscribe(req, res, url);
+    if (p === "/site-config.js" && (m === "GET" || m === "HEAD")) { const js = "window.ABSEL_SITE=" + JSON.stringify(crm.siteConfig()).replace(/</g, "\\u003c") + ";"; res.writeHead(200, { ...SEC, "Content-Type": MIME[".js"], "Cache-Control": "no-cache" }); return res.end(m === "HEAD" ? undefined : js); }
     if (p === "/api/crm/login" && m === "POST") return await login(req, res);
     if (p === "/api/crm/password" && m === "POST") return await changePassword(req, res);
     if (p === "/api/crm/logout" && m === "POST") return send(res, 200, { ok: true }, { "Set-Cookie": cookie("", 0) });

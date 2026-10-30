@@ -251,7 +251,7 @@
         ["overview", "Business overview", "grid", seesBiz, "", "Leads, FTDs, funding and clients across the business"],
         ["payperf", "Payment performance", "chart", seesPayPerf, "", "Payment volumes, speed and methods"]] }] },
     { hub: "settings", label: "Settings", icon: "gear", bottom: true, groups: [
-      { title: "Organisation", items: [["settings", "Settings", "gear", isAdmin, "", "Company, sales rules, integrations and security"]] },
+      { title: "Organisation", items: [["settings", "Settings", "gear", isAdmin, "", "Company, sales rules, integrations and security"], ["websitesettings", "Website settings", "gear", isAdmin, "", "Links, WhatsApp number and support email on abselglobal.com"]] },
       { title: "People", items: [["team", "Team", "users", () => isMgr() || isMktMgr(), "", "Users, roles, territories and targets"]] },
       { title: "Client area", items: [["portalsettings", "Client area settings", "gear", isAdmin, "", "Account types, payments, MT5 and the partner programme"]] },
       { title: "Data", items: [["import", "Import leads", "upload", () => isMgr() || isMktMgr(), "", "Upload leads from a CSV file"]] }] },

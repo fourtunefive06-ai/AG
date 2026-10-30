@@ -378,6 +378,9 @@ window.ABSEL_CONFIG = {
   liveTicker: true             // TradingView live price tape (works on your domain; falls back to a static tape)
 };
 </script>
+<!-- The links, WhatsApp number and support email from Settings → Website settings. If this can't load, the values in the page stay. -->
+<script src="/site-config.js"></script>
+<script src="/site-fields.js?v=1"></script>
 
 <div class="riskbar"><div class="wrap"><b>Risk warning:</b> CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage. You may lose more than your initial deposit.</div></div>
 
@@ -599,7 +602,7 @@ window.ABSEL_CONFIG = {
 <!-- =================== FAQ =================== -->
 <section class="block platform" id="faq">
   <div class="wrap faq-grid">
-    <div class="intro"><span class="eyebrow">FAQ</span><h2>Questions before you start.</h2><p>Our team answers on WhatsApp and at support@abselglobal.com, Monday to Friday.</p><button class="btn btn-cta" data-open-lead>Request a call back</button></div>
+    <div class="intro"><span class="eyebrow">FAQ</span><h2>Questions before you start.</h2><p>Our team answers on WhatsApp and at <span data-site="email">support@abselglobal.com</span>, Monday to Friday.</p><button class="btn btn-cta" data-open-lead>Request a call back</button></div>
     <div>
       <details><summary>Who will hold my account?</summary><p>Absel Global is a trading name of Absel Markets, licensed by the Financial Services Commission of Mauritius under licence no. GB25205423. Your account and your money are held by the licensed company.</p></details>
       <details><summary>Is my money safe?</summary><p>Client funds are held in segregated bank accounts, separate from the company's own operational funds, as the FSC requires. Professional indemnity insurance adds a further layer of protection. Trading itself carries risk and you can lose money.</p></details>
@@ -635,9 +638,9 @@ window.ABSEL_CONFIG = {
         <p style="margin-top:18px;max-width:320px">Absel Global is a trading name of Absel Markets, an FX &amp; CFD broker regulated by the FSC Mauritius.</p>
       </div>
       <div><h4>Contact</h4>
-        <span class="c-label">Email</span><span class="contact-line">support@abselglobal.com</span>
+        <span class="c-label">Email</span><span class="contact-line" data-site="email">support@abselglobal.com</span>
         <span class="c-label">Phone</span><span class="contact-line">+230 214 4906</span>
-        <span class="c-label">WhatsApp</span><span class="contact-line">+44 7576 077989</span>
+        <span class="c-label">WhatsApp</span><span class="contact-line" data-site="whatsapp">+44 7576 077989</span>
       </div>
       <div><h4>Office</h4><p>Level 6, Ken Lee Building<br>20 Edith Cavell Street<br>Port-Louis 11302, Mauritius</p></div>
       <div><h4>Legal</h4>
@@ -733,6 +736,12 @@ window.ABSEL_CONFIG = {
 <script>
 (function(){
   var CFG=window.ABSEL_CONFIG||{};
+  var SITE=window.ABSEL_SITE||{},FIELDS=window.ABSEL_FIELDS;["registerUrl","loginUrl","whatsapp","supportEmail"].forEach(function(k){if(SITE[k])CFG[k]=SITE[k]});
+  if(SITE.popup_delay!==undefined)CFG.popupDelaySeconds=SITE.popup_delay;
+  if(SITE.exit_intent!==undefined)CFG.exitIntent=SITE.exit_intent;
+  if(SITE.live_ticker!==undefined)CFG.liveTicker=SITE.live_ticker;
+  // Text saved in Website settings replaces the page's own text, before the forms are built from the template
+  try{if(FIELDS)FIELDS.apply(document,SITE)}catch(e){}
   var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
   function store(k,v){try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){return null}}
   // Partner (IB) referral link: /r/CODE sends visitors here with ?ib=CODE. First touch wins for 90 days.
@@ -742,6 +751,11 @@ window.ABSEL_CONFIG = {
   /* config links */
   $$("[data-cfg-href]").forEach(function(a){var v=CFG[a.dataset.cfgHref];if(v)a.href=v});
   if(CFG.whatsapp) $("#waBtn").href="https://wa.me/"+CFG.whatsapp;
+  $$('a[href="/portal/#register"]').forEach(function(a){if(CFG.registerUrl)a.setAttribute("href",CFG.registerUrl)});
+  $$('a[href="/portal/"]').forEach(function(a){if(CFG.loginUrl)a.setAttribute("href",CFG.loginUrl)});
+  $$('[data-site="email"]').forEach(function(el){if(CFG.supportEmail)el.textContent=CFG.supportEmail});
+  // The page spells the original number with spaces; a changed number shows as +digits
+  $$('[data-site="whatsapp"]').forEach(function(el){if(CFG.whatsapp&&el.textContent.replace(/\D/g,"")!==CFG.whatsapp)el.textContent="+"+CFG.whatsapp});
 
   /* ---------- Countries ---------- */
   var RESTRICTED=["United Arab Emirates","United States","Canada","Singapore","Cuba","Eritrea","Myanmar","Iran","North Korea","Kyrgyzstan","Syria","Liberia","Yemen","Somalia","Jamaica","Albania","Barbados","Cambodia","Panama"];
@@ -765,7 +779,7 @@ window.ABSEL_CONFIG = {
     if(prefix==="pop") $("[data-h]",node).id="popHeading";
     slot.appendChild(node);
     var root=slot, f=$("form",root), g=function(id){return $("#"+prefix+"-"+id,root)};
-    var sel=g("country"), dial=g("dial"), btn=$("button[type=submit]",f), rmsg=$(".restricted",f);
+    var sel=g("country"), dial=g("dial"), btn=$("button[type=submit]",f), btnText=btn.textContent, rmsg=$(".restricted",f);
     var o=document.createElement("option");o.value="";o.textContent="Select your country";sel.appendChild(o);
     COUNTRIES.forEach(function(c){var op=document.createElement("option");op.value=c[0];op.dataset.dial=c[1];op.textContent=c[0];sel.appendChild(op)});
     var ot=document.createElement("option");ot.value="Other";ot.dataset.dial="+";ot.textContent="Other";sel.appendChild(ot);
@@ -803,13 +817,13 @@ window.ABSEL_CONFIG = {
         $$(".wa-link").forEach(function(a){if(CFG.whatsapp)a.href="https://wa.me/"+CFG.whatsapp});
         try{(window.dataLayer=window.dataLayer||[]).push({event:"generate_lead",lead_form:lead.form,interest:lead.interest,country:lead.country});if(window.fbq)fbq("track","Lead");if(window.gtag)gtag("event","generate_lead")}catch(e){}
       }
-      function fail(msg){btn.disabled=false;btn.textContent="Request my call back";serr.textContent=msg||"We couldn't send your details. Check your connection and try again, or message us on WhatsApp.";serr.hidden=false}
+      function fail(msg){btn.disabled=false;btn.textContent=btnText;serr.textContent=msg||"We couldn't send your details. Check your connection and try again, or message us on WhatsApp.";serr.hidden=false}
       var FIELD={firstName:"fname",lastName:"lname",email:"email",phone:"phone",country:"country",city:"city"};
       function showErrors(errs){var first=null;Object.keys(errs||{}).forEach(function(k){var el=FIELD[k]&&g(FIELD[k]);if(el){setErr(el,errs[k]);first=first||el}else if(k==="consent"){g("consent").parentElement.classList.add("invalid")}});if(first)first.focus()}
       var send=typeof window.ABSEL_SUBMIT==="function"?window.ABSEL_SUBMIT(lead):(CFG.leadEndpoint?fetch(CFG.leadEndpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lead)}).then(function(r){return r.json().catch(function(){return{}}).then(function(d){d.status=r.status;return d})}):Promise.resolve({ok:true}));
       Promise.resolve(send).then(function(d){
         if(d&&d.ok){finish(d.reference);return}
-        btn.disabled=false;btn.textContent="Request my call back";
+        btn.disabled=false;btn.textContent=btnText;
         if(d&&d.errors){showErrors(d.errors);return}
         fail(d&&d.error);
       }).catch(function(){fail()});
@@ -817,7 +831,7 @@ window.ABSEL_CONFIG = {
     forms[prefix]={slot:slot,setInterest:function(v){g("interest").value=v},first:function(){return g("fname")}};
   }
   buildForm($('[data-lead-slot="hero"]'),"hero");
-  buildForm($('[data-lead-slot="popup"]'),"pop","Get your account set up");
+  buildForm($('[data-lead-slot="popup"]'),"pop",(SITE.content&&SITE.content.pop_form_title)||"Get your account set up");
 
   /* ---------- Popup ---------- */
   var modal=$("#leadModal"), lastFocus=null, autoShown=store("ag_auto")==="1";
@@ -852,18 +866,13 @@ window.ABSEL_CONFIG = {
   }
 
   /* ---------- Markets tabs ---------- */
-  var MK=[
-    {k:"Forex",t:"Forex",d:"70+ major, minor and exotic currency pairs with leverage up to 1:500.",pts:["Raw ECN spreads from 0.2 pips","Trade 24 hours, Monday to Friday","Majors, minors and exotics"],rows:[["EUR/USD","Euro vs US Dollar"],["GBP/USD","Pound vs US Dollar"],["USD/JPY","US Dollar vs Yen"],["AUD/USD","Aussie vs US Dollar"],["USD/ZAR","US Dollar vs Rand"]]},
-    {k:"Commodities",t:"Commodities",d:"Gold, silver, oil and agricultural CFDs to diversify or hedge.",pts:["Spot gold and silver","Crude oil CFDs","Long or short in one click"],rows:[["XAU/USD","Gold vs US Dollar"],["XAG/USD","Silver vs US Dollar"],["USOIL","WTI Crude Oil"],["UKOIL","Brent Crude Oil"]]},
-    {k:"Indices",t:"Indices",d:"Trade the direction of the world's leading stock markets.",pts:["US, UK and European benchmarks","No need to buy every stock","Go long or short"],rows:[["US500","S&P 500"],["NAS100","Nasdaq 100"],["GER40","DAX 40"],["UK100","FTSE 100"]]},
-    {k:"Futures",t:"Futures",d:"Energy, metals and index futures CFDs on MT5.",pts:["Energy and metals futures","Index futures","Margin-based trading"],rows:[["Energy","Oil and gas futures"],["Metals","Gold and silver futures"],["Index","Equity index futures"]]},
-    {k:"Crypto",t:"Crypto CFDs",d:"Trade price moves in major cryptocurrencies without a wallet.",pts:["No crypto wallet needed","Go long or short","Trade with MT5 tools"],rows:[["BTC/USD","Bitcoin"],["ETH/USD","Ethereum"],["XRP/USD","Ripple"]]}
-  ];
+  var MK=(SITE.markets&&SITE.markets.length&&SITE.markets)||(FIELDS&&FIELDS.MARKETS)||[];
+  function escMk(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
   var tabs=$(".mk-tabs"),panel=$("#mkPanel");
   function showMk(i){
     $$("button",tabs).forEach(function(b,j){b.setAttribute("aria-selected",j===i?"true":"false");b.tabIndex=j===i?0:-1});
     var m=MK[i];
-    panel.innerHTML='<div class="mk-info"><span class="eyebrow">'+m.k+'</span><h3 style="margin-top:12px">'+m.t+'</h3><p>'+m.d+'</p><ul>'+m.pts.map(function(p){return"<li>"+p+"</li>"}).join("")+'</ul><button class="btn btn-cta" data-mk>Trade '+m.t+'</button></div><div class="mk-table"><table><thead><tr><th>Instrument</th><th>Description</th><th></th></tr></thead><tbody>'+m.rows.map(function(r){return'<tr><td class="sym">'+r[0]+'</td><td>'+r[1]+'</td><td class="act"><button class="mini-btn" data-mk>Trade</button></td></tr>'}).join("")+'</tbody></table></div>';
+    panel.innerHTML='<div class="mk-info"><span class="eyebrow">'+escMk(m.k)+'</span><h3 style="margin-top:12px">'+escMk(m.t)+'</h3><p>'+escMk(m.d)+'</p><ul>'+m.pts.map(function(p){return"<li>"+escMk(p)+"</li>"}).join("")+'</ul><button class="btn btn-cta" data-mk>Trade '+escMk(m.t)+'</button></div><div class="mk-table"><table><thead><tr><th>Instrument</th><th>Description</th><th></th></tr></thead><tbody>'+m.rows.map(function(r){return'<tr><td class="sym">'+escMk(r[0])+'</td><td>'+escMk(r[1])+'</td><td class="act"><button class="mini-btn" data-mk>Trade</button></td></tr>'}).join("")+'</tbody></table></div>';
     $$("[data-mk]",panel).forEach(function(b){b.addEventListener("click",function(){openModal()})});
   }
   MK.forEach(function(m,i){var b=document.createElement("button");b.setAttribute("role","tab");b.textContent=m.k;b.addEventListener("click",function(){showMk(i)});
