@@ -290,6 +290,23 @@ The CRM has **two workspaces**, so each team sees only the tools it uses.
 
 ---
 
+## Message templates and branding
+
+**Layout.** Every email goes through one layout, [lib/email-layout.js](lib/email-layout.js): logo on navy, the template body, then the footer. It's sent as multipart/alternative (plain text and HTML) with every provider. Tables, 600 px, inline CSS, no external fonts or scripts. In a body, a line starting with `•` becomes a list, URLs become links, and `{{button:Label|{{login_url}}}}` on its own line becomes a button.
+
+**Settings.** Client area settings → Email branding: custom logo URL (a hosted PNG or JPG, never SVG; leave it empty and the header uses `public/assets/email-logo-white.png` on a dark colour or `email-logo-dark.png` on a light one), header and button colours, help line, legal line, risk warning, address, website, social links, and *Send test email to me*. The footer comes from here, so don't type the legal line, risk warning or unsubscribe link into a template.
+
+**Categories.** Each template is one of:
+- *Transactional* (account, payment, KYC, security): no unsubscribe link; sent even to marketing opt-outs. Email still goes to Do-not-contact leads; WhatsApp never does.
+- *Marketing* (newsletter, re-engagement, offers): has an unsubscribe link; respects opt-outs and Do not contact.
+- *System* (email verification, password reset, staff daily digest): can be edited, but not deleted or switched off. Verification and reset links are never stored in the message log. If `{{verify_url}}` or `{{reset_url}}` is edited out, the link is added at the end.
+
+**Variables.** `first_name`, `last_name`, `full_name`, `reference`, `interest`, `country`, `city`, `agent_name`, `agent_phone`, `agent_email`, `company`, `register_url`, `login_url`, `whatsapp_number`, `unsubscribe_url`, `demo_login`, `demo_server`, `download_url`, `login`, `server`, `account_type`, `account`, `amount`, `method`, `reason`, `retry_url`, `verify_url`, `reset_url`, `bonus_expiry_date`, `two_factor_status`. A value the event doesn't have comes out empty. **A password is never a variable:** no email, WhatsApp message or log may contain one.
+
+**WhatsApp.** Headers, footers and buttons exist only in templates approved by Meta, and must match the approved version exactly. [docs/whatsapp-templates-for-meta.md](docs/whatsapp-templates-for-meta.md) lists what to submit. A new template sends only once its approved name is filled in; until then the automation logs "WhatsApp template not approved yet" and sends its fallback email, if it has one.
+
+**Adding a template.** Back office: Templates → New template. In code: add it to `V7_TEMPLATES` (or a new version block) in `lib/core.js`. Templates and automations are added by id and never overwrite what staff have edited. Regenerate the docs with `node tools/gen-message-docs.mjs`; test with `node tools/messages-test.mjs`.
+
 ## 1. Try it locally with demo data
 
 You need **Node.js 22.13 or newer** (`node -v`).

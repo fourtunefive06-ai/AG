@@ -22,6 +22,7 @@ const b2b = require("./lib/b2binpay.js");
 const cyrafa = require("./lib/cyrafa.js");
 const mt5 = require("./lib/mt5.js");
 const { runSync: mt5RunSync } = require("./lib/mt5-sync.js");
+const { renderEmail, configOf } = require("./lib/email-layout.js");
 const mt5Actions = require("./lib/mt5-actions.js");
 
 /* ------------------------------------------------------------------ config */
@@ -102,6 +103,8 @@ async function boot() {
 // Postgres: finish sending saved changes before the process stops
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, async () => { if (store && store.flush) { const ok = await store.flush(10000); if (!ok) console.error("✖ Some changes weren't sent to the database yet; they're kept in the journal and sent at the next start."); } process.exit(0); });
 
+// Every email goes out in the branded layout, as plain text and HTML together
+function sendBranded(to, msg) { const subject = msg.subject || "(no subject)", r = renderEmail(Object.assign({}, msg, { subject }), crm.getSettings()); return channels.sendEmail(to, subject, r.text, r.html); }
 let sending = false;
 async function drainQueue() {
   if (sending) return; sending = true;
@@ -110,7 +113,7 @@ async function drainQueue() {
       const id = sendQueue.shift(), m = store.get("messages", id);
       if (!m || m.status !== "queued") continue;
       try {
-        const r = m.channel === "email" ? await channels.sendEmail(m.to, m.subject || "(no subject)", m.body) : await channels.sendWhatsApp(m);
+        const r = m.channel === "email" ? await sendBranded(m.to, m) : await channels.sendWhatsApp(m);
         store.transaction(() => crm.markMessage(m.id, "sent", { provider_id: r.provider_id }));
       } catch (e) {
         m.attempts = (m.attempts || 0) + 1;
@@ -125,7 +128,8 @@ async function drainQueue() {
 /* ------------------------------------------------------- daily MIS email */
 async function sendMis(day, to) {
   const m = crm.misSummary(day);
-  for (const r of to) await channels.sendEmail(r, m.subject, m.text);
+  const mail = crm.systemEmail("tpl_sys_digest", { digest: m.text, date: day, leads: m.leads, ftds: m.ftds });
+  for (const r of to) await sendBranded(r, mail);
   return { sent: to.length, subject: m.subject, day };
 }
 async function dailyMis() {
@@ -237,6 +241,7 @@ const RPC = {
   report: (u, t, f) => crm.report(u, t, f),
   listUsers: u => crm.listUsers(u), saveUser: (u, p) => crm.saveUser(u, p), setAvailability: (u, a) => crm.setAvailability(u, a),
   listRules: u => crm.listRules(u), saveRule: (u, r) => crm.saveRule(u, r), deleteRule: (u, id) => crm.deleteRule(u, id),
+  previewEmail: (u, t) => { const p = crm.previewTemplate(u, t), s = crm.getSettings(), file = configOf(s).logo_file, r = renderEmail(p, s, file ? { logo_src: "data:image/png;base64," + fs.readFileSync(path.join(ROOT, "public", "assets", file)).toString("base64") } : {}); return { subject: p.subject, text: r.text, html: r.html }; },
   listTemplates: u => crm.listTemplates(u), saveTemplate: (u, t) => crm.saveTemplate(u, t), deleteTemplate: (u, id) => crm.deleteTemplate(u, id),
   listAutomations: u => crm.listAutomations(u), saveAutomation: (u, a) => crm.saveAutomation(u, a), deleteAutomation: (u, id) => crm.deleteAutomation(u, id),
   listNotifications: u => crm.listNotifications(u), markRead: (u, ids) => crm.markRead(u, ids),
@@ -317,6 +322,13 @@ const ASYNC_RPC = {
     if (mt5.cfg().mode !== "api") throw new CrmError("MT5 is in manual mode (MT5_MODE=manual in .env).");
     try { const r = await mt5Sync(u); drainQueue(); return r; } catch (e) { throw new CrmError("MT5 sync failed: " + e.message); }
   },
+  async sendTestEmail(u) {
+    if (u.role !== "admin") throw new CrmError("Only admins can do this.", 403);
+    if (!channels.status().email.configured) throw new CrmError("Connect an email provider first (EMAIL_PROVIDER in .env).");
+    const me = store.get("users", u.id), to = me && me.email; if (!to) throw new CrmError("Add your email address to your user first.");
+    await sendBranded(to, crm.previewTemplate(u, { subject: "Test email from {{company}}", preheader: "This is how your emails look.", category: "marketing", body: "Hi {{first_name}},\n\nThis is a test of the branded email layout, with sample data:\n• logo and header colour\n• button colour\n• footer text\n\n{{button:Open the client area|{{login_url}}}}\n\nThe {{company}} team" }));
+    return { to };
+  },
   async sendMisNow(u) {
     if (u.role !== "admin") throw new CrmError("Only admins can do this.", 403);
     const cfg = crm.getSettings().mis_email || {};
@@ -379,10 +391,8 @@ const brand = () => ((crm.getSettings().portal || {}).brand) || "Absel Global";
 // Verification and reset links are emailed directly and never stored in the message log
 async function sendClientLink(kind, to, firstName, token) {
   const link = siteUrl() + "/portal/#" + kind + "?t=" + encodeURIComponent(token);
-  const subject = kind === "verify" ? `Confirm your email for ${brand()}` : `Reset your ${brand()} password`;
-  const text = kind === "verify" ? `Hi ${firstName},\n\nWelcome to ${brand()}. Confirm your email to open your trading account:\n${link}\n\nThe link works for 48 hours. If you didn't sign up, ignore this email.\n\nThe ${brand()} team`
-    : `Hi ${firstName},\n\nSomeone asked to reset the password for your ${brand()} client area. To choose a new password, open:\n${link}\n\nThe link works for 1 hour. If it wasn't you, ignore this email; your password stays the same.\n\nThe ${brand()} team`;
-  try { await channels.sendEmail(to, subject, text); return null; }
+  const mail = crm.systemEmail(kind === "verify" ? "tpl_sys_verify" : "tpl_sys_reset", { first_name: firstName, company: brand(), [kind === "verify" ? "verify_url" : "reset_url"]: link });
+  try { await sendBranded(to, mail); return null; }
   catch (e) { if (!IS_PROD) { console.log(`  [dev] ${kind} link for ${to}: ${link}`); return link; } console.error("Client email failed:", e.message); return null; }
 }
 const PORTAL_RPC = {
