@@ -109,10 +109,32 @@ try {
   assert.throws(() => crm.mt5AccountCreate(OPS, rK.id), /KYC is no longer approved/); passed++;
   ok(store.get("accounts", rK.id).status === "requested", "KYC refusal leaves the request untouched");
   cx.kyc.status = "approved"; store.put("clients", cx);
-  const keepTo = process.env.MT5_LOGIN_TO, aR = alerts.length; process.env.MT5_LOGIN_TO = String(mock.state.next - 1); // MT5's next login is just outside our range
-  await execute(ctx, crm.mt5AccountCreate(OPS, rK.id).op); process.env.MT5_LOGIN_TO = keepTo;
+  const keepTo = process.env.MT5_LOGIN_TO, aR = alerts.length; process.env.MT5_LOGIN_TO = String(mock.state.next - 1); mock.state.ignoreLogin = true; // a server that ignores our login and uses its own series
+  await execute(ctx, crm.mt5AccountCreate(OPS, rK.id).op); process.env.MT5_LOGIN_TO = keepTo; mock.state.ignoreLogin = false;
   const aK = store.get("accounts", rK.id);
   ok(aK.status === "requested" && !aK.login && /OUTSIDE the Absel Global range/.test(aK.mt5_error) && alerts.length > aR, "a login outside our range is not linked, and it's alerted");
+  // our system picks the login: inside the range, unique, whatever MT5's own series would have given
+  const nextOf = () => Math.max(...crm.mt5UsedLogins().map(Number).filter(mt5.inRange)) + 1, addLogin = () => mock.state.calls.filter(c => c.path === "/api/user/add").pop();
+  for (const [l, mu2] of mock.state.users) if (mu2.Comment === "ABSEL " + rK.id) mock.state.users.delete(l); // that one was only outside the shrunken range
+  const keepNext = mock.state.next; mock.state.next = 11114535; // MT5's own series is far outside our range
+  const takenInMt5 = nextOf(); mock.state.users.set(String(takenInMt5), { Login: takenInMt5, Group: G, Comment: "not ours" }); // made in MT5 Manager, unknown to the CRM
+  await execute(ctx, crm.mt5AccountCreate(OPS, rK.id).op);
+  const aPick = store.get("accounts", rK.id);
+  ok(aPick.status === "open" && mt5.inRange(aPick.login) && Number(aPick.login) === takenInMt5 + 1 && mock.state.next === 11114535, "the login is chosen inside the range, and one already in MT5 is skipped");
+  // another account takes the login between our check and the create: MT5 says 3004 and the next one is used
+  const rRace = crm.portalRequestAccount(three.C, { type: "ecn", leverage: 100 }), raced = nextOf(); mock.state.users.set(String(raced), { Login: raced, Group: G, Comment: "not ours" });
+  const free13 = Object.assign(Object.create(mt5), { getUser: async l => { if (Number(l) === raced) throw Object.assign(new Error("13 Not found"), { retcode: 13 }); return mt5.getUser(l); } });
+  await execute({ mt5: free13, crm, store }, crm.mt5AccountCreate(OPS, rRace.id).op);
+  ok(store.get("accounts", rRace.id).status === "open" && Number(store.get("accounts", rRace.id).login) === raced + 1, "a login taken at the last moment (3004): the next one is used");
+  // the range is full or MT5 can't be read: refused before anything is created
+  const rFull = crm.portalRequestAccount(three.C, { type: "ecn", leverage: 100 }), keepFrom = process.env.MT5_LOGIN_FROM, sizeFull = mock.state.users.size, lastUsed = nextOf() - 1;
+  process.env.MT5_LOGIN_FROM = String(lastUsed); process.env.MT5_LOGIN_TO = String(lastUsed);
+  await execute(ctx, crm.mt5AccountCreate(OPS, rFull.id).op); process.env.MT5_LOGIN_FROM = keepFrom; process.env.MT5_LOGIN_TO = keepTo;
+  ok(store.get("accounts", rFull.id).status === "requested" && /is taken\. No account was created/.test(store.get("accounts", rFull.id).mt5_error) && mock.state.users.size === sizeFull, "range full: refused, nothing created");
+  const denied = Object.assign(Object.create(mt5), { getUser: async () => { throw Object.assign(new Error("MT5 read user: 8 Access denied"), { retcode: 8 }); } });
+  await execute({ mt5: denied, crm, store }, crm.mt5AccountCreate(OPS, rFull.id).op);
+  ok(store.get("accounts", rFull.id).status === "requested" && mock.state.users.size === sizeFull, "can't confirm a login is free: nothing created");
+  mock.state.next = keepNext;
   // leverage: only the type's list; changed in MT5 with an audit entry
   assert.throws(() => crm.mt5Leverage(OPS, req.id, 333), /allowed/); passed++;
   await execute(ctx, crm.mt5Leverage(OPS, req.id, 500).op);

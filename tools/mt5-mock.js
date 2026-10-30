@@ -62,7 +62,7 @@ function startMock(o = {}) {
     if (path === "/api/user/add" && method === "POST") {
       if (!body || !cfg.groups.includes(body.Group)) return err("3 Invalid parameters (unknown group)");
       if (!qs.get("pass_main") || !qs.get("pass_investor")) return err("3 Invalid parameters (passwords)");
-      const login = body.Login ? String(body.Login) : String(S.next++);
+      const login = body.Login && !S.ignoreLogin ? String(body.Login) : String(S.next++); // ignoreLogin: a server that picks the login itself
       if (!inRange(login)) return err("8 Access denied (login outside the manager's range)");
       if (userOf(login)) return err("3004 Login already exists");
       putUser(Object.assign({}, body, { Login: Number(login), Balance: 0 })); return { body: ok(userOf(login)) };
